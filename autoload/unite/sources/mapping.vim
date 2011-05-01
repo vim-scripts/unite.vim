@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: bookmark.vim
+" FILE: mapping.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 20 Aug 2010
+" Last Modified: 27 Apr 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -24,19 +24,50 @@
 " }}}
 "=============================================================================
 
-if exists('g:loaded_unite_source_bookmark')
-  finish
-endif
-
 let s:save_cpo = &cpo
 set cpo&vim
 
-command! -nargs=? -complete=file UniteBookmarkAdd call unite#sources#bookmark#_append(<q-args>)
+" Variables  "{{{
+"}}}
 
-let g:loaded_unite_source_bookmark = 1
+function! unite#sources#mapping#define()"{{{
+  return s:source
+endfunction"}}}
+
+let s:source = {
+      \ 'name' : 'mapping',
+      \ 'description' : 'candidates from Vim mappings',
+      \ 'max_candidates' : 30,
+      \ 'hooks' : {},
+      \ }
+
+let s:cached_result = []
+function! s:source.hooks.on_init(args, context)"{{{
+  " Get mapping list.
+  redir => l:redir
+  silent! nmap
+  redir END
+
+  let s:cached_result = []
+  for line in split(l:redir, '\n')
+    let l:map = matchstr(line, '^\a*\s*\zs\S\+')
+    if l:map !~ '^<' || l:map =~ '^<SNR>'
+      continue
+    endif
+    let l:map = substitute(l:map, '\(<.*>\)', '\\\1', 'g')
+
+    call add(s:cached_result, {
+          \ 'word' : l:line,
+          \ 'kind' : 'command',
+          \ 'action__command' : 'execute "normal ' . l:map . '"',
+          \ })
+  endfor
+endfunction"}}}
+function! s:source.gather_candidates(args, context)"{{{
+  return s:cached_result
+endfunction"}}}
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
 
-" __END__
 " vim: foldmethod=marker

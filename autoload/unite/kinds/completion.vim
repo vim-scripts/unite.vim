@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: command.vim
+" FILE: completion.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 22 Apr 2011.
+" Last Modified: 27 Apr 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,36 +27,54 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#kinds#command#define()"{{{
+function! unite#kinds#completion#define()"{{{
   return s:kind
 endfunction"}}}
 
 let s:kind = {
-      \ 'name' : 'command',
-      \ 'default_action' : 'execute',
+      \ 'name' : 'completion',
+      \ 'default_action' : 'insert',
       \ 'action_table': {},
-      \ 'alias_table' : { 'ex' : 'nop', 'narrow' : 'edit' },
       \}
 
 " Actions"{{{
-let s:kind.action_table.execute = {
-      \ 'description' : 'execute command',
+let s:kind.action_table.insert = {
+      \ 'description' : 'insert word',
       \ }
-function! s:kind.action_table.execute.func(candidate)"{{{
-  " Add history.
-  let l:type = has_key(a:candidate, 'action__type') ? a:candidate.action__type : ':'
-  call histadd(l:type, a:candidate.action__command)
-  if l:type ==# '/'
-    call unite#set_search_pattern(string(a:candidate.action__command))
-  endif
+function! s:kind.action_table.insert.func(candidate)"{{{
+  let l:col = a:candidate.action__complete_pos
+  let l:cur_text = matchstr(getline('.'), '^.*\%' . l:col . 'c.')
+  let l:word = a:candidate.action__complete_word
 
-  execute l:type.a:candidate.action__command
+  " Insert word.
+  let l:context_col = unite#get_current_unite().context.col
+  let l:next_line = l:context_col < col('$') ?
+        \ getline('.')[l:context_col-1 :] : ''
+  let l:next_line = getline('.')[l:context_col :]
+  call setline(line('.'), split(l:cur_text . l:word . l:next_line, '\n\|\r\n'))
+  let l:pos = getpos('.')
+  let l:pos[2] = len(l:cur_text)+len(l:word)+1
+  call setpos('.', l:pos)
+  let l:next_col = len(l:cur_text)+len(l:word)+1
+
+  if l:next_col < col('$')
+    startinsert
+  else
+    startinsert!
+  endif
 endfunction"}}}
-let s:kind.action_table.edit = {
-      \ 'description' : 'edit command',
+
+let s:kind.action_table.preview = {
+      \ 'description' : 'preview word in echo area',
+      \ 'is_quit' : 0,
       \ }
-function! s:kind.action_table.edit.func(candidate)"{{{
-  call feedkeys(':' . a:candidate.action__command, 'n')
+function! s:kind.action_table.preview.func(candidate)"{{{
+  echo ''
+  redraw
+
+  if has_key(a:candidate, 'action__complete_info')
+    echo join(split(a:candidate.action__complete_info, '\n\|\r\n')[: &cmdheight-1], '\n')
+  endif
 endfunction"}}}
 "}}}
 

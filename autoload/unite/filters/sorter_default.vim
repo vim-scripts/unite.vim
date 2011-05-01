@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: bookmark.vim
+" FILE: sorter_default.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 20 Aug 2010
+" Last Modified: 22 Apr 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -24,19 +24,40 @@
 " }}}
 "=============================================================================
 
-if exists('g:loaded_unite_source_bookmark')
-  finish
-endif
-
 let s:save_cpo = &cpo
 set cpo&vim
 
-command! -nargs=? -complete=file UniteBookmarkAdd call unite#sources#bookmark#_append(<q-args>)
+function! unite#filters#sorter_default#define()"{{{
+  return s:sorter
+endfunction"}}}
 
-let g:loaded_unite_source_bookmark = 1
+let s:sorter = {
+      \ 'name' : 'sorter_default',
+      \ 'description' : 'default sorter',
+      \}
+
+function! s:sorter.filter(candidates, context)"{{{
+  let l:candidates = a:candidates
+  for l:default in s:default_sorters
+    let l:filter = unite#get_filters(l:default)
+    if !empty(l:filter)
+      let l:candidates = l:filter.filter(l:candidates, a:context)
+    endif
+  endfor
+
+  return l:candidates
+endfunction"}}}
+
+
+let s:default_sorters = ['sorter_nothing']
+function! unite#filters#sorter_default#get()"{{{
+  return s:default_sorters
+endfunction"}}}
+function! unite#filters#sorter_default#use(sorters)"{{{
+  let s:default_sorters = a:sorters
+endfunction"}}}
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
 
-" __END__
 " vim: foldmethod=marker

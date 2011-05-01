@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: window.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 27 Dec 2010.
+" Last Modified: 22 Apr 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -23,6 +23,9 @@
 "     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 " }}}
 "=============================================================================
+
+let s:save_cpo = &cpo
+set cpo&vim
 
 function! unite#sources#window#define()"{{{
   return s:source
@@ -58,16 +61,14 @@ function! s:source.hooks.on_init(args, context)"{{{
     endif
   endfor
 
-  if winnr() != 0
-    unlet l:list[winnr()-1]
-  endif
+  unlet l:list[winnr()-1]
   call sort(l:list, 's:compare')
-  if winnr() != 0
-    " Add previous window.
+  if empty(a:args) || a:args[0] !=# 'no-current'
+    " Add current window.
     call add(l:list, winnr())
   endif
 
-  let s:candidates = []
+  let a:context.source__candidates = []
   for i in l:list
     let l:window = getwinvar(i, 'unite_window')
     let l:bufname = bufname(winbufnr(i))
@@ -75,25 +76,27 @@ function! s:source.hooks.on_init(args, context)"{{{
       let l:bufname = '[No Name]'
     endif
 
-    call add(s:candidates, {
+    call add(a:context.source__candidates, {
           \ 'word' : l:bufname,
           \ 'abbr' : printf('[%d/%d] %s %s(%s)', i, winnr('$'),
           \      (i == winnr() ? '%' : i == winnr('#') ? '#' : ' '),
           \      l:bufname, l:window.cwd),
           \ 'kind' : 'window',
-          \ 'source' : 'window',
           \ 'action__window_nr' : i,
           \ 'action__directory' : l:window.cwd,
           \ })
   endfor
 endfunction"}}}
 function! s:source.gather_candidates(args, context)"{{{
-  return s:candidates
+  return a:context.source__candidates
 endfunction"}}}
 
 " Misc
 function! s:compare(candidate_a, candidate_b)"{{{
   return getwinvar(a:candidate_b, 'unite_window').time - getwinvar(a:candidate_a, 'unite_window').time
 endfunction"}}}
+
+let &cpo = s:save_cpo
+unlet s:save_cpo
 
 " vim: foldmethod=marker

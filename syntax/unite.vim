@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: syntax/unite.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 09 Nov 2010
+" Last Modified: 22 Apr 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -30,26 +30,41 @@ elseif exists('b:current_syntax')
   finish
 endif
 
+let s:save_cpo = &cpo
+set cpo&vim
+
 syntax match uniteStatusLine /\%1l.*/
-\            contains=uniteSourcePrompt,uniteSourceSeparator,uniteSourceNames
+      \  contains=uniteSourcePrompt,uniteSeparator,uniteSourceNames,uniteSourceArgs
 syntax match uniteSourcePrompt /^Sources/ contained nextgroup=uniteSourceSeparator
-syntax match uniteSourceSeparator /: / contained nextgroup=uniteSourceNames
-syntax match uniteSourceNames /[a-z_/-]\+/ contained
+syntax match uniteSeparator /:/ contained nextgroup=uniteSourceNames
+syntax match uniteSourceNames / [[:alnum:]_\/-]\+/ contained nextgroup=uniteSourceArgs
+syntax match uniteMessage /^\[.*\].*$/
+      \  contains=uniteMessageSource
+syntax match uniteMessageSource /^\[.*\]/ contained
+syntax match uniteSourceArgs /:\S\+/ contained
 
 syntax match uniteInputLine /\%2l.*/ contains=uniteInputPrompt,uniteInputPromptError,uniteInputSpecial
-syntax match uniteInputSpecial /\\\@<![*!,]/ contained
 
 syntax match uniteMarkedLine /^\*.*/
 syntax match uniteNonMarkedLine /^-.*/     contains=uniteCandidateSourceName,uniteCandidateAbbr
-syntax match uniteCandidateSourceName /^- \zs[a-z_/-]\+/ contained
 
+syntax region   uniteError   start=+!!!+ end=+!!!+ contains=uniteErrorHidden oneline
+if has('conceal')
+  " Supported conceal features.
+  syntax match   uniteErrorHidden            '!!!' contained conceal
+else
+  syntax match   uniteErrorHidden            '!!!' contained
+endif
+
+highlight default link uniteSourcePrompt  Statement
+highlight default link uniteSeparator  NONE
 highlight default link uniteSourceNames  Type
-highlight default link uniteSourcePrompt  PreProc
-highlight default link uniteSourceSeparator  NONE
+highlight default link uniteSourceArgs  Function
+highlight default link uniteMessage Comment
+highlight default link uniteMessageSource Constant
 
 highlight default link uniteMarkedLine  Statement
 highlight default link uniteCandidateSourceName  Type
-highlight default link uniteCandidateAbbr  Pmenu
 
 " The following definitions are for <Plug>(unite-choose-action).
 highlight default link uniteChooseAction  NONE
@@ -63,4 +78,11 @@ highlight default link uniteInputPrompt  Identifier
 highlight default link uniteInputPromptError  Error
 highlight default link uniteInputSpecial  Special
 
+highlight default link uniteError Error
+highlight default link uniteErrorHidden Ignore
+
 let b:current_syntax = 'unite'
+
+let &cpo = s:save_cpo
+unlet s:save_cpo
+

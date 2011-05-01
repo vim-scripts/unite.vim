@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: buffer.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 19 Dec 2010.
+" Last Modified: 22 Apr 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -23,6 +23,9 @@
 "     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 " }}}
 "=============================================================================
+
+let s:save_cpo = &cpo
+set cpo&vim
 
 " Variables  "{{{
 let s:buffer_list = {}
@@ -59,15 +62,27 @@ endfunction"}}}
 let s:source_buffer_all = {
       \ 'name' : 'buffer',
       \ 'description' : 'candidates from buffer list',
+      \ 'syntax' : 'uniteSource__Buffer',
+      \ 'hooks' : {},
       \}
 
-function! s:source_buffer_all.gather_candidates(args, context)"{{{
-  let l:list = s:get_buffer_list()
+function! s:source_buffer_all.hooks.on_init(args, context)"{{{
+  let a:context.source__buffer_list = s:get_buffer_list()
+endfunction"}}}
+function! s:source_buffer_all.hooks.on_syntax(args, context)"{{{
+  syntax match uniteSource__Buffer_Directory /\[.*\]/ contained containedin=uniteSource__Buffer
+  highlight default link uniteSource__Buffer_Directory PreProc
+endfunction"}}}
 
-  let l:candidates = map(l:list, '{
+function! s:source_buffer_all.gather_candidates(args, context)"{{{
+  if a:context.is_redraw
+    " Recaching.
+    let a:context.source__buffer_list = s:get_buffer_list()
+  endif
+
+  let l:candidates = map(copy(a:context.source__buffer_list), '{
         \ "word" : s:make_abbr(v:val.action__buffer_nr),
         \ "kind" : "buffer",
-        \ "source" : "buffer",
         \ "action__path" : unite#substitute_path_separator(bufname(v:val.action__buffer_nr)),
         \ "action__buffer_nr" : v:val.action__buffer_nr,
         \ "action__directory" : s:get_directory(v:val.action__buffer_nr),
@@ -79,19 +94,33 @@ endfunction"}}}
 let s:source_buffer_tab = {
       \ 'name' : 'buffer_tab',
       \ 'description' : 'candidates from buffer list in current tab',
+      \ 'syntax' : 'uniteSource__BufferTab',
+      \ 'hooks' : {},
       \}
 
+function! s:source_buffer_tab.hooks.on_init(args, context)"{{{
+  let a:context.source__buffer_list = s:get_buffer_list()
+endfunction"}}}
+function! s:source_buffer_tab.hooks.on_syntax(args, context)"{{{
+  syntax match uniteSource__BufferTab_Directory /\[.*\]/ containedin=uniteSource__BufferTab
+  highlight default link uniteSource__BufferTab_Directory PreProc
+endfunction"}}}
+
 function! s:source_buffer_tab.gather_candidates(args, context)"{{{
+  if a:context.is_redraw
+    " Recaching.
+    let a:context.source__buffer_list = s:get_buffer_list()
+  endif
+
   if !exists('t:unite_buffer_dictionary')
     let t:unite_buffer_dictionary = {}
   endif
 
-  let l:list = filter(s:get_buffer_list(), 'has_key(t:unite_buffer_dictionary, v:val.action__buffer_nr)')
+  let l:list = filter(copy(a:context.source__buffer_list), 'has_key(t:unite_buffer_dictionary, v:val.action__buffer_nr)')
 
   let l:candidates = map(l:list, '{
         \ "word" : s:make_abbr(v:val.action__buffer_nr),
         \ "kind" : "buffer",
-        \ "source" : "buffer_tab",
         \ "action__path" : unite#substitute_path_separator(bufname(v:val.action__buffer_nr)),
         \ "action__buffer_nr" : v:val.action__buffer_nr,
         \ "action__directory" : s:get_directory(v:val.action__buffer_nr),
@@ -105,10 +134,12 @@ function! s:make_abbr(bufnr)"{{{
   let l:filetype = getbufvar(a:bufnr, '&filetype')
   if l:filetype ==# 'vimfiler'
     let l:path = getbufvar(a:bufnr, 'vimfiler').current_dir
-    let l:path = '*vimfiler* - ' . unite#substitute_path_separator(simplify(l:path))
+    let l:path = printf('*vimfiler* [%s]', unite#substitute_path_separator(simplify(l:path)))
   elseif l:filetype ==# 'vimshell'
-    let l:path = getbufvar(a:bufnr, 'vimshell').save_dir
-    let l:path = '*vimshell* - ' . unite#substitute_path_separator(simplify(l:path))
+    let l:vimshell = getbufvar(a:bufnr, 'vimshell')
+    let l:path = printf('*vimshell*: %s [%s]',
+          \ (has_key(l:vimshell, 'cmdline') ? l:vimshell.cmdline : ''),
+          \ unite#substitute_path_separator(simplify(l:vimshell.save_dir)))
   else
     let l:path = bufname(a:bufnr) . (getbufvar(a:bufnr, '&modified') ? '[+]' : '')
     let l:path = unite#substitute_path_separator(simplify(l:path))
@@ -137,7 +168,7 @@ function! s:get_buffer_list()"{{{
   let l:list = []
   let l:bufnr = 1
   while l:bufnr <= bufnr('$')
-    if buflisted(l:bufnr) && l:bufnr != bufnr('#')
+    if buflisted(l:bufnr) && l:bufnr != bufnr('%')
       if has_key(s:buffer_list, l:bufnr)
         call add(l:list, s:buffer_list[l:bufnr])
       else
@@ -150,17 +181,20 @@ function! s:get_buffer_list()"{{{
 
   call sort(l:list, 's:compare')
 
-  if buflisted(bufnr('#'))
+  if buflisted(bufnr('%'))
     " Add current buffer.
-    if has_key(s:buffer_list, bufnr('#'))
-      call add(l:list, s:buffer_list[bufnr('#')])
+    if has_key(s:buffer_list, bufnr('%'))
+      call add(l:list, s:buffer_list[bufnr('%')])
     else
       call add(l:list,
-            \ { 'action__buffer_nr' : bufnr('#'), 'source__time' : 0 })
+            \ { 'action__buffer_nr' : bufnr('%'), 'source__time' : 0 })
     endif
   endif
 
   return l:list
 endfunction"}}}
+
+let &cpo = s:save_cpo
+unlet s:save_cpo
 
 " vim: foldmethod=marker

@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: common.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 24 Nov 2010
+" Last Modified: 22 Apr 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -24,6 +24,9 @@
 " }}}
 "=============================================================================
 
+let s:save_cpo = &cpo
+set cpo&vim
+
 function! unite#kinds#common#define()"{{{
   return s:kind
 endfunction"}}}
@@ -44,9 +47,13 @@ endfunction"}}}
 
 let s:kind.action_table.yank = {
       \ 'description' : 'yank text',
+      \ 'is_selectable' : 1,
       \ }
-function! s:kind.action_table.yank.func(candidate)"{{{
-  let @" = a:candidate.word
+function! s:kind.action_table.yank.func(candidates)"{{{
+  let @" = join(map(copy(a:candidates), 'v:val.word'), "\n")
+  if has('clipboard')
+    let @* = @"
+  endif
 endfunction"}}}
 
 let s:kind.action_table.yank_escape = {
@@ -69,25 +76,15 @@ let s:kind.action_table.insert = {
       \ 'description' : 'insert word',
       \ }
 function! s:kind.action_table.insert.func(candidate)"{{{
-  let [l:old_col, l:old_max_col] = [col('.'), col('$')]
-
   " Paste.
   let l:old_reg = @"
   let @" = a:candidate.word
   normal! ""p
   let @" = l:old_reg
-
-  if unite#get_context().is_insert
-    PP! [l:old_col+len(a:candidate.word), l:old_max_col]
-    if l:old_col+1 >= l:old_max_col
-      startinsert!
-    else
-      let l:pos = getpos('.')
-      let l:pos[2] += len(a:candidate.word)
-      call setpos('.', l:pos)
-    endif
-  endif
 endfunction"}}}
 "}}}
+
+let &cpo = s:save_cpo
+unlet s:save_cpo
 
 " vim: foldmethod=marker

@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: tab.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 14 Dec 2010.
+" Last Modified: 22 Apr 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -24,6 +24,9 @@
 " }}}
 "=============================================================================
 
+let s:save_cpo = &cpo
+set cpo&vim
+
 function! unite#sources#tab#define()"{{{
   return s:source
 endfunction"}}}
@@ -45,8 +48,10 @@ function! s:source.gather_candidates(args, context)"{{{
   if exists('*gettabvar')
     call sort(l:list, 's:compare')
   endif
-  " Add current tab.
-  call add(l:list, tabpagenr())
+  if empty(a:args) || a:args[0] !=# 'no-current'
+    " Add current tab.
+    call add(l:list, tabpagenr())
+  endif
 
   let l:candidates = []
   for i in l:list
@@ -101,7 +106,6 @@ function! s:source.gather_candidates(args, context)"{{{
           \ 'word' : l:word,
           \ 'abbr' : l:abbr,
           \ 'kind' : 'tab',
-          \ 'source' : 'tab',
           \ 'action__tab_nr' : i,
           \ 'action__directory' : l:cwd,
           \ })
@@ -114,5 +118,8 @@ endfunction"}}}
 function! s:compare(candidate_a, candidate_b)"{{{
   return gettabvar(a:candidate_b, 'unite_tab_access_time') - gettabvar(a:candidate_a, 'unite_tab_access_time')
 endfunction"}}}
+
+let &cpo = s:save_cpo
+unlet s:save_cpo
 
 " vim: foldmethod=marker

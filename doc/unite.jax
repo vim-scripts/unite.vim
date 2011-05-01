@@ -1,6 +1,6 @@
 *unite.txt*	すべてのsourceを統合する
 
-Version: 1.0
+Version: 2.0
 Author : Shougo <Shougo.Matsu@gmail.com>
 Japanese Documentation Author: naoina
 License: MIT license  {{{
@@ -34,12 +34,14 @@ License: MIT license  {{{
     sourceの変数	    |unite-sources-variables|
   キーマッピング	  |unite-key-mappings|
   関数			  |unite-functions|
-  source		  |unite-source|
-  kind			  |unite-kind|
-  アクション		  |unite-action|
+  source		  |unite-sources|
+  kind			  |unite-kinds|
+  アクション		  |unite-actions|
+  filter		  |unite-filters|
 設定例			|unite-examples|
 sourceの作成		|unite-create-source|
 kindの作成		|unite-create-kind|
+filterの作成		|unite-create-filter|
 ユーザーのsource	|unite-user-sources|
 ToDo			|unite-todo|
 既知のバグ			|unite-bugs|
@@ -175,9 +177,16 @@ http://www.ustream.tv/recorded/11240673
 		る。
 
 						*unite-options-start-insert*
+						*unite-options-no-start-insert*
 		-start-insert
-		初期状態が絞り込みモードになる。指定しないと、初期状態はNormal
-		modeになる。
+		初期状態が絞り込みモードになる。
+
+		-no-start-insert
+		初期状態がNormal modeになる。
+
+		両方のオプションを指定しないと、初期状態は
+		|g:unite_enable_start_insert|に依存する。
+		両方のオプションが指定されたときの動作は未定義である。
 
 						*unite-options-no-quit*
 		-no-quit
@@ -193,6 +202,41 @@ http://www.ustream.tv/recorded/11240673
 		-winheight={window-height}
 		uniteバッファの高さを指定する。指定しないと、
 		|g:unite_winheight|が使われる。
+
+						*unite-options-immediately*
+		-immediately
+		候補が一つしかないとき、即座にアクションを実行する。候補がな
+		いときにはuniteバッファを開かない。
+
+						*unite-options-auto-preview*
+		-auto-preview
+		候補を選択した際、自動的に"preview"アクションを実行する。
+
+						*unite-options-completion*
+		-completion
+		uniteの補完インタフェースを使用する。|unite-options-col|を同
+		時に設定しなければならない。
+
+						*unite-options-col*
+		-col={column-number}
+		uniteを開始した位置を指定する。
+
+						*unite-options-vertical*
+		-vertical
+		uniteバッファを垂直分割する。
+
+						*unite-options-horizontal*
+		-horizontal
+		uniteバッファを水平分割する。
+		
+		両方のオプションを指定しないと、初期状態は
+		|g:unite_enable_split_vertically|に依存する。両方のオプションが
+		指定されたときの動作は未定義である。
+
+						*unite-options-direction*
+		-direction={direction}
+		Defines split position rule. The default value is same to
+		|g:unite_split_rule|.
 
 :UniteWithCurrentDir [{options}] {sources}	*:UniteWithCurrentDir*
 		初期の絞込みテキストが現在のディレクトリである他は|:Unite|と同
@@ -241,17 +285,6 @@ g:unite_enable_start_insert			*g:unite_enable_start_insert*
 		
 		初期値は0である。
 
-g:unite_enable_ignore_case			*g:unite_enable_ignore_case*
-		大文字・小文字を区別するかを制御する。1ならば区別しない。
-		
-		初期値は'ignorecase'オプションと同じである。
-
-g:unite_enable_smart_case			*g:unite_enable_smart_case*
-		入力に大文字が含まれている場合は、大文字・小文字を区別する。1
-		ならば有効になる。
-		
-		初期値は'infercase'オプションと同じである。
-
 g:unite_split_rule				*g:unite_split_rule*
 		uniteのウィンドウを生成する際、画面分割の位置ルールを指定する。
 		
@@ -287,6 +320,16 @@ g:unite_lcd_command				*g:unite_lcd_command*
 		
 		初期値は"lcd"である。
 
+g:unite_cursor_line_highlight			*g:unite_cursor_line_highlight*
+		カーソル行のハイライトを指定する。
+		
+		初期値は"PmenuSel"である。
+
+g:unite_abbr_highlight				*g:unite_abbr_highlight*
+		候補の短縮文字列のハイライトを指定する。
+		
+		初期値は"Pmenu"である。
+
 g:unite_quick_match_table			*g:unite_quick_match_table*
 		入力文字と対応する、クイックマッチリストの補完候補のテーブルで
 		ある。
@@ -314,8 +357,7 @@ g:unite_source_file_ignore_pattern		*g:unite_source_file_ignore_pattern*
 		|unite-source-file|, |unite-source-file_rec|の候補に表示しな
 		いファイルの正規表現パターンを指定する。マッチングはファイル
 		のフルパスに対して行われる。この変数が空文字列以外であれば、
-		指定した正規表現で結果をフィルタリングする。正規表現の大文字・
-		小文字の区別は'ignorecase'の設定次第である。
+		指定した正規表現で結果をフィルタリングする。
 
 		初期値は autoload/unite/sources/file.vim を参照。
 
@@ -324,7 +366,7 @@ g:unite_source_file_mru_time_format		*g:unite_source_file_mru_time_format*
 		を指定する。フォーマットは|strftime()|で指定できるものと同じ
 		である。
 		
-		初期値は"(%c)"である。
+		初期値は"(%c) "である。
 
 g:unite_source_file_mru_filename_format		*g:unite_source_file_mru_filename_format*
 		|unite-source-file_mru|のファイル名の表示フォーマットを指定
@@ -347,8 +389,8 @@ g:unite_source_file_mru_ignore_pattern		*g:unite_source_file_mru_ignore_pattern*
 		|unite-source-file_mru|の候補に表示しないファイルの正規表現
 		パターンを指定する。マッチングはファイルのフルパスに対して行
 		われる。この変数が空文字列以外であれば、指定した正規表現で結
-		果をフィルタリングする。正規表現の大文字・小文字は
-		'ignorecase'の設定に関わらず、明確に区別される。
+		果をフィルタリングする。正規表現の大文字・小文字は明確に区別さ
+		れる。
 		
 		初期値は autoload/unite/sources/file_mru.vim を参照。
 
@@ -365,11 +407,14 @@ g:unite_source_bookmark_file			*g:unite_source_bookmark_file*
 		
 		初期値は |g:unite_data_directory| . '/.bookmark' である。
 
-g:unite_source_file_rec_max_depth		*g:unite_source_file_rec_max_depth*
-		|unite-source-file_rec|が検索するディレクトリ深さの最大値を
-		指定する。
+g:unite_source_file_rec_ignore_pattern		*g:unite_source_file_rec_ignore_pattern*
+		|unite-source-file_rec|の候補に表示しないファイルの正規表現
+		パターンを指定する。マッチングはファイルのフルパスに対して行
+		われる。この変数が空文字列以外であれば、指定した正規表現で結
+		果をフィルタリングする。正規表現の大文字・小文字は明確に区別さ
+		れる。
 		
-		初期値は10である。
+		初期値は autoload/unite/sources/file_rec.vim を参照。
 
 kindの変数					*unite-kinds-variables*
 
@@ -394,6 +439,9 @@ g:unite_kind_jump_list_after_jump_scroll	*g:unite_kind_jump_list_after_jump_scro
 <Plug>(unite_exit)				*<Plug>(unite_exit)*
 		uniteを終了する。
 
+<Plug>(unite_restart)				*<Plug>(unite_restart)*
+		unitを再起動する。
+
 <Plug>(unite_do_default_action)			*<Plug>(unite_do_default_action)*
 		選択している候補に対してデフォルトのアクションを実行する。アク
 		ションは候補のkindごとに定義されている。kindについては
@@ -401,10 +449,10 @@ g:unite_kind_jump_list_after_jump_scroll	*g:unite_kind_jump_list_after_jump_scro
 		|unite-default-action|を参照。
 
 <Plug>(unite_choose_action)			*<Plug>(unite_choose_action)*
-		選択している候補に対して実行するアクションを選択する。アクショ
-		ンは候補のkindごとに定義されている。複数の候補が選択されている
-		場合は共通なアクションのみ選択ができる。kindについては
-		|unite-kind|を参照。
+		uniteインタフェースにより、選択している候補に対して実行するアク
+		ションを選択する。アクションは候補のkindごとに定義されている。
+		複数の候補が選択されている場合は共通なアクションのみ選択ができ
+		る。kindについては|unite-kind|を参照。
 
 <Plug>(unite_insert_enter)			*<Plug>(unite_insert_enter)*
 		カーソル位置から絞込みテキスト入力を開始する。ただし、カーソル
@@ -459,6 +507,10 @@ g:unite_kind_jump_list_after_jump_scroll	*g:unite_kind_jump_list_after_jump_scro
 
 <Plug>(unite_input_directory)			*<Plug>(unite_input_directory)*
 		ディレクトリ名を入力して絞り込みを行う。
+
+<Plug>(unite_delete_backward_path)		*<Plug>(unite_delete_backward_path)*
+		一つ上のパスまで削除する。
+		|i_<Plug>(unite_delete_backward_path)|を参照せよ。
 
 インサートモードマッピング
 
@@ -534,12 +586,14 @@ I		|<Plug>(unite_insert_head)|
 a		|<Plug>(unite_append_enter)|
 A		|<Plug>(unite_append_end)|
 q		|<Plug>(unite_exit)|
+<C-r>		|<Plug>(unite_restart)|
 <Space>		|<Plug>(unite_toggle_mark_current_candidate)|
 <Tab>		|<Plug>(unite_choose_action)|
 <C-n>		|<Plug>(unite_rotate_next_source)|
 <C-p>		|<Plug>(unite_rotate_previous_source)|
 <C-g>		|<Plug>(unite_print_candidate)|
 <C-l>		|<Plug>(unite_redraw)|
+<C-h>		|<Plug>(unite_delete_backward_path)|
 gg		|<Plug>(unite_cursor_top)|
 j		|<Plug>(unite_loop_cursor_down)|
 <Down>		|<Plug>(unite_loop_cursor_down)|
@@ -586,7 +640,7 @@ x		候補を選択している場合は|i_<Plug>(unite_quick_match_default_actio
 
 CORE						*unite-functions-core*
 
-unite#available_kinds([{kind-name}])		*unite#available_kinds()*
+unite#get_kinds([{kind-name}])			*unite#get_kinds()*
 			{kind-name}に指定されたkindを取得する。kindが存在しな
 			い場合は空のディクショナリを返す。{kind-name}を省略し
 			た場合、キーがkind名、値がそれぞれのkindとしたディク
@@ -594,7 +648,7 @@ unite#available_kinds([{kind-name}])		*unite#available_kinds()*
 
 			この戻り値を変更してはいけない。
 
-unite#available_sources([{source-name}])	*unite#available_sources()*
+unite#get_sources([{source-name}])		*unite#get_sources()*
 			{source-name}に指定されたsourceを取得する。sourceが存
 			在しない場合は空のディクショナリを返す。{source-name}
 			を省略した場合、キーがsource名、値がそれぞれのsourceと
@@ -677,14 +731,41 @@ unite#set_substitute_pattern({buffer-name}, {pattern}, {subst} [, {priority}])
 		において、~を$HOME、/は部分マッチできるように、ワイルドカードを
 		付加するようになっている。
 >
-		call unite#set_substitute_pattern('files', '^\~', substitute(substitute($HOME, '\\', '/', 'g'), ' ', '\\\\ ', 'g'), -100)
-		call unite#set_substitute_pattern('files', '[^~.*]\zs/', '*/*', 100)
+		call unite#set_substitute_pattern('files', '^\~',
+		\ substitute(unite#util#substitute_path_separator($HOME), ' ', '\\\\ ', 'g'), -100)
+		call unite#set_substitute_pattern('files', '[^~.*]\ze/', '\0*', 100)
+		call unite#set_substitute_pattern('files', '/\ze[^~.*]', '/*', 100)
 <
 unite#get_substitute_pattern({buffer-name})
 						*unite#get_substitute_pattern()*
 		uniteのバッファ名{buffer-name}における絞込みテキストの置換パタ
 		ーンを取得する。{buffer-name}に置換パターンが定義されていない
 		と、エラーになる。デバッグ用である。
+
+unite#set_buffer_name_option({buffer-name}, {option-name}, {value})
+						*unite#set_buffer_name_option()*
+		uniteのバッファ名{buffer-name}における{option-name}のオプショ
+		ンを{value}に設定する。
+		
+		現在、次のオプション名が有効である。
+		
+		substitute_patterns		(辞書)
+		置換文字列のパターンを指定する。辞書のkeyは"pattern",
+		"subst", "priority"である。詳しい仕様は
+		|unite#set_substitute_pattern()|を参照せよ。
+		
+		filters				(リスト)
+		filter名のリストを指定する。ここで指定したfilterは、source毎
+		に呼び出される普通のfilterとは異なり、全候補を結合した後に呼
+		び出される。
+		
+		ignorecase			(数値)
+		uniteバッファで一時的にセットされる'ignorecase'オプションの値を
+		決定する。省略すると、'ignorecase'の値と同じになる。
+		
+		smartcase			(数値)
+		大文字が入力されているときに、'ignorecase'オプションの値を無視
+		するかどうか決定する。省略すると、'smartcase'の値と同じになる。
 
 unite#custom_default_action({kind}, {default-action})
 						*unite#custom_default_action()*
@@ -727,6 +808,15 @@ unite#custom_alias({kind}, {name}, {action})
 >
 		call unite#custom_alias('file', 'h', 'left')
 <
+unite#custom_filters({source-name}, {filters})	*unite#custom_filters()*
+		{source-name}のfilterを{filters}に変更する。
+		{source-name}は","区切りで複数指定ができる。
+		{filters}は使用するfilterの名前、もしくは名前のリストである。
+		filterは指定したリストの順番で呼び出される。
+		{filters}は"matcher", "sorter", "converter"の名前のリストで
+		指定することに注意しなければならない。特にmatcherの指定を忘
+		れると、絞り込みができなくなるであろう。
+
 unite#take_action({action-name}, {candidate})
 						*unite#take_action()*
 		{candidate}に対し、{action-name}という名前のアクションを実行する。
@@ -750,16 +840,48 @@ unite#define_kind({kind})			*unite#define_kind()*
 		|unite-create-kind|を参照せよ。
 		すでにその名前のkindが存在する場合は上書きされる。
 
+unite#define_filter({filter})			*unite#define_filter()*
+		{filter}を動的に追加する。filterの仕様については、
+		|unite-create-filter|を参照せよ。
+		すでにその名前のfilterが存在する場合は上書きされる。
+
 unite#undef_source({name})			*unite#undef_source()*
-		|unite#define_source()|で追加した{name}というsourceを削除する。
+		|unite#define_source()|で追加した{name}というsourceを削除
+		する。
 		存在しないときは無視される。
 
 unite#undef_kind({name})			*unite#undef_kind()*
 		|unite#define_kind()|で追加した{name}というkindを削除する。
 		存在しないときは無視される。
 
+unite#undef_filter({name})			*unite#undef_filter()*
+		|unite#define_filter()|で追加した{name}というfilterを
+		削除する。
+		存在しないときは無視される。
+
+unite#filters#default#use({filters})		*unite#filters#default#use(()*
+		|unite-filter-default|が使用するデフォルトのfilterを
+		{filters}に変更する。{filters}には、filter名のリストを指定す
+		る。
+
+unite#filters#matcher_default#use({matchers})	*unite#filters#matcher_default#use(()*
+		|unite-filter-matcher_default|が使用するデフォルトのmatcher
+		を{matchers}に変更する。{matchers}には、matcher名のリストを
+		指定する。
+
+unite#filters#sorter_default#use({sorters})	*unite#filters#sorter_default#use(()*
+		|unite-filter-sorter_default|が使用するデフォルトのsorterを
+		{sorters}に変更する。{sorters}には、sorter名のリストを指定す
+		る。
+
+						*unite#filters#converter_default#use(()*
+unite#filters#converter_default#use({converters})
+		|unite-filter-converter_default|が使用するデフォルトの
+		converterを{converters}に変更する。{converters}には、
+		converter名のリストを指定する。
+
 ==============================================================================
-source						*unite-source*
+source						*unite-sources*
 
 ここでは、標準で実装されているsourceの仕様を解説する。
 
@@ -777,9 +899,11 @@ directory_mru	最近使用したカレントディレクトリを候補とする
 file_rec	入力された絞り込みテキストのディレクトリまたは、現在ディレクト
 		リ直下のファイルすべてを候補とする。ディレクトリや隠しファイル
 		は候補から除外される。候補が多すぎる場合はフリーズするかもしれ
-		ない。
+		ない。候補はsource内でキャッシュされるため、キャッシュを更新
+		するためには、|<Plug>(unite_redraw)|を用いる。
 
-		sourceの引数として、絞り込み文字列を取る。
+		source引数：
+		1. 絞り込み文字列
 
 						*unite-source-buffer*
 buffer		開いているバッファを候補とする。バッファは使用した順番に整列さ
@@ -798,8 +922,13 @@ tab		開いているタブを候補とする。t:cwdをカレントディレク�
 		使用される。)存在していなかったら、代わりにタブの中での現在の
 		バッファ名が使われる。
 
+		source引数：
+		1. no-currentを指定すると、カレントタブを除外する。
+
 						*unite-source-register*
 register	レジスタに保存されている文字列を候補とする。
+		|yanktmp|がインストールされている場合、それも仮想レジスタとして
+		参照できる。
 
 						*unite-source-bookmark*
 bookmark	ブックマークされたファイルやディレクトリを候補とする。
@@ -814,10 +943,26 @@ source		uniteのsource名そのものを候補とする。
 window		開いているウィンドウを候補とする。ウィンドウは移動した順番に
 		整列される。
 
-==============================================================================
-kind						*unite-kind*
+		source引数：
+		1. no-currentを指定すると、カレントウインドウを除外する。
 
-ここでは、標準で実装されているkindの仕様と、内部で使用する属性について解説する。
+						*unite-source-output*
+output		実行したVimコマンドの出力を候補とする。
+
+		source引数：
+		1. 実行するVimコマンド
+
+						*unite-source-command*
+command		VimのExコマンドを候補とする。
+
+						*unite-source-mapping*
+mapping		ユーザーが定義したマッピングを候補とする。
+
+==============================================================================
+kind						*unite-kinds*
+
+ここでは、標準で実装されているkindの仕様と、内部で使用する属性について解説す
+る。
 
 						*unite-kind-common*
 common		共通アクション
@@ -915,6 +1060,11 @@ command		VimのExコマンド
 			action__command		(文字列)		(必須)
 				実行するコマンド
 
+			action__type		(文字列)		(任意)
+				実行するコマンドの型。省略すると":"となる。
+				":"または"/"のみ指定できる。指定できる型につ
+				いての説明は、|histadd()|を参照せよ。
+
 						*unite-kind-window*
 window		ウィンドウ
 		このkindはcdableを継承するため、それらのkindが使用する属性も
@@ -923,11 +1073,74 @@ window		ウィンドウ
 			action__window_nr	(文字列)		(必須)
 				対象となるウィンドウの番号
 
-==============================================================================
-アクション					*unite-action*
+						*unite-kind-completion*
+completion	補完
 
-|<Plug>(unite_choose_action)|で選択するときは、アクション名を補完したり、曖昧で
-なければ先頭文字で省略することができる。
+			action__complete_word	(String)	(必須)
+				補完する文字列
+
+			action__complete_pos	(Number)	(必須)
+				補完する位置
+
+			action__complete_info	(String)	(任意)
+				補完候補の追加情報
+
+==============================================================================
+filter						*unite-filter*
+
+ここでは、標準で実装されているfilterの仕様と、内部で使用する属性について解説
+する。
+
+filterには大まかに分けて、"matcher", "sorter", "converter"の三種類が存在する。
+matcherは入力に合う候補を取り出し、sorterは候補の並べ換えを行い、converterは
+候補の見ためを変更する。
+filterはデフォルトで、|unite-filter-default|にあるものが使用される。
+だが、|unite#custom_filters()|でsource毎に変更することも可能である。
+
+						*unite-filter-default*
+default		特にfilterが指定されていないときに呼び出される、デフォルトの
+		filter。このfilterは登録用のダミーである。
+		初期状態では、["matcher_glob", "sorter_nothing",
+		"converter_nothing"]のfilterを呼び出す。
+		|unite#filters#default#use()|を呼び出すことで、デフォルトの
+		filterを変更することができる。
+
+						*unite-filter-matcher_default*
+matcher_default	|unite-filter-default|により呼び出される、デフォルトのmatcher。
+		初期状態では、["matcher_glob"]のmatcherを呼び出す。
+		|unite#filters#matcher_default#use()|を呼び出すことで、デフォルトの
+		matcherを変更することができる。
+
+						*unite-filter-matcher_glob*
+matcher_glob	ユーザーが入力したglobパターンにより候補をフィルタリングする
+		matcher。
+		絞り込みにはwordを使用する。
+
+						*unite-filter-sorter_default*
+sorter_default	|unite-filter-default|により呼び出される、デフォルトのsorter。
+		初期状態では、["sorter_nothing"]のsorterを呼び出す。
+		|unite#filters#sorter_default#use()|を呼び出すことで、デフォルトの
+		sorterを変更することができる。
+
+						*unite-filter-sorter_nothing*
+sorter_nothing	何もsortをしないsorter。source側のsortがそのまま反映される。
+
+						*unite-filter-sorter_word*
+sorter_word	wordを比較するsorter。
+
+						*unite-filter-converter_default*
+converter_default
+		|unite-filter-default|により呼び出される、デフォルトのconverter。
+		初期状態では、["converter_nothing"]のconverterを呼び出す。
+		|unite#filters#converter_default#use()|を呼び出すことで、デフォルトの
+		converterを変更することができる。
+
+						*unite-filter-converter_nothing*
+converter_nothing
+		候補を何も変更しないconverter。
+
+==============================================================================
+アクション					*unite-actions*
 
 kind別アクション
 
@@ -935,15 +1148,14 @@ common					*unite-action-common*
 全てのkindに共通なインタフェースを定義している。
 内部では、candidate.wordを使う。
 	nop		何もしない
-	yank		ヤンクする
+	yank		候補文字列をヤンクする
 	yank_escape	エスケープした候補文字列をヤンクする
-	ex		候補をコマンドラインに入力した状態にする
+	ex		候補をエスケープして、コマンドラインに入力した状態にする
 	insert		現在のバッファに文字列を挿入する
 
 openable					*unite-action-openable*
-オープン可能ファイルのインタフェースを定義している。
-内部でopenアクションを呼び出すので、openアクションは継承したkind側が個別に定義
-する必要がある。
+オープン可能ファイルのインタフェースを定義している。内部でopenアクションを呼
+び出すので、openアクションは継承したkind側が個別に定義する必要がある。
 	tabopen		ファイルをタブで開く
 	split		ウィンドウを水平分割してファイルを開く
 	vsplit		ウィンドウを垂直分割してファイルを開く
@@ -962,8 +1174,11 @@ cd可能ファイルのインタフェースを定義している。
 	vimshell	そのディレクトリで|vimshell|を起動する。これ
 			は|vimshell|がインストールされている場合にのみ有効なア
 			クションである。
-	tabvimshell	そのディレクトリで|:VimShellTab|を実行する。これは
-			|vimshell|がインストールされている場合にのみ有効な
+	vimfiler	そのディレクトリで|vimfiler|を起動する。これは
+			|vimfiler|がインストールされている場合にのみ有効なア
+			クションである。
+	tabvimfiler	そのディレクトリで|:VimFilerTab|を実行する。これは
+			|vimfiler|がインストールされている場合にのみ有効な
 			アクションである。
 	rec		そのディレクトリで|unite-source-file_rec|を起動する。
 
@@ -973,6 +1188,8 @@ file						*unite-action-file*
 	open		ファイルを開く
 	preview		プレビューウィンドウにファイルを開く
 	bookmark	候補をブックマークに追加する
+	mkdir		ファイル名をディレクトリ名としてディレクトリを作成する。
+			ファイルが存在する場合は無効。
 
 buffer						*unite-action-buffer*
 このkindは|unite-action-file|のアクションを継承している。
@@ -1007,12 +1224,17 @@ jump_list					*unite-action-jump_list*
 
 command						*unite-action-command*
 	execute		コマンドを実行する
+	edit		コマンドをコマンドラインに入力する
 
 window						*unite-action-window*
 このkindは|unite-action-cdable|のアクションを継承する。
 	open		ウィンドウへ移動
 	delete		ウィンドウを閉じる
 	only		そのウィンドウ以外すべて閉じる
+
+completion					*unite-action-completion*
+	insert		候補の挿入
+	preview		候補の情報を表示
 
 source別アクション
 
@@ -1041,7 +1263,7 @@ jump_list	open
 ==============================================================================
 sourceの作成					*unite-create-source*
 
-autoload/unite/sources//に*.vimのファイルを置いておくと、自動的に読み込まれる。
+autoload/unite/sources/に*.vimのファイルを置いておくと、自動的に読み込まれる。
 その際、unite#sources#{source_name}#define()が呼ばれ、戻り値がsourceと解釈される。
 戻り値はリストでもよく、その場合はsourceのリストと解釈される。
 sourceを追加したくない場合は、空リストを返せば良い。
@@ -1065,8 +1287,12 @@ name			文字列		(必須)
 			  sourceの名前としては使えない。
 
 						*unite-source-attribute-gather_candidates*
-gather_candidates	関数		(必須)
-			uniteが候補を収集する際に呼ばれる。
+gather_candidates	関数		(ほぼ必須)
+			uniteが候補を収集する際に一度だけ呼ばれる。ただし、
+			|<Plug>(unite_redraw)|による再描画の際にも呼ばれる。
+			sourceが|unite-source-attribute-is_volatile|の場合は、
+			|unite-source-attribute-change_candidates|が定義され
+			ていない限り、入力文字列が変化すると呼ばれる。
 			この関数は{args}と{context}を引数に取り、{candidate}の
 			リストを返す。
 			{args}は|:Unite|コマンドを実行された際にsourceに渡され
@@ -1075,6 +1301,38 @@ gather_candidates	関数		(必須)
 			{context}については|unite-notation-{context}|、
 			{candidate}については|unite-notation-{candidate}|を参照
 			せよ。
+			この属性は基本的に必須だが、他の属性を用いて候補を取得
+			できる場合には省略することができる。
+			この属性で収集された候補はuniteバッファによりキャッ
+			シュされる。キャッシュはuniteバッファが閉じられるま
+			で有効だが、uniteバッファが閉じられると
+			|:UniteResume|を使わない限り破棄される。uniteバッファ
+			の寿命によらず永続的にキャッシュしたい場合は、source
+			側でキャッシュを保存しておく必要がある。
+
+						*unite-source-attribute-change_candidates*
+change_candidates	関数		(任意)
+			uniteが候補を収集する際に、入力文字列が変化すると呼ばれ
+			る。入力文字列から候補を生成するときに便利である。
+			この属性で追加する候補は、
+			|unite-source-attribute-gather_candidates|によって
+			キャッシュした候補に追加される。
+			この関数は{args}と{context}を引数に取り、{candidate}の
+			リストを返す。
+			引数や戻り値の仕様は
+			|unite-source-attribute-gather_candidates|と同一であ
+			る。
+
+						*unite-source-attribute-async_gather_candidates*
+async_gather_candidates	関数		(任意)
+			uniteが候補を収集する際に、非同期に呼ばれる。時間のかか
+			る処理を細切れで行う際に便利である。
+			デフォルトのタイミングは、|g:unite_update_time|である。
+			この関数は{args}と{context}を引数に取り、{candidate}の
+			リストを返す。
+			引数や戻り値の仕様は
+			|unite-source-attribute-gather_candidates|と同一であ
+			る。
 
 						*unite-source-attribute-hooks*
 hooks			辞書		(任意)
@@ -1090,13 +1348,32 @@ hooks			辞書		(任意)
 			この関数が呼ばれた際、まだuniteバッファは初期化されてい
 			ないので呼び出す関数には注意しなければならない。
 
+			on_syntax		*unite-source-attribute-hooks-on_syntax*
+			uniteバッファが初期化され、source毎のシンタックスが
+			設定された後に呼ばれる。
+			|unite-source-attribute-syntax|が設定されていない場
+			合は呼び出されない。
+			この関数は{args}と{context}を引数に取る。
+			source毎のハイライト設定はここで行う。
+
+			ハイライトの設定例：
+>
+			syntax match uniteSource_FileMru_Time /(.*)/ contained containedin=uniteSource_FileMru
+			highlight default link uniteSource_FileMru_Time Statement
+<
+			|unite-source-attribute-syntax|で設定したsyntax名を
+			containedinで指定することに注意しなければならない。
+
 			on_close		*unite-source-attribute-hooks-on_close*
 			<Plug>(unite_exit)を実行したときや、コマンドの実行後に
-			uniteバッファが閉じられる前に呼ばれる。
+			uniteバッファが閉じられた後に呼ばれる。
 			この関数は{args}と{context}を引数に取る。
-			この関数が呼ばれたとしても、まだuniteバッファが残ってい
-			る可能性があるので、内部で使用する変数は解放しないほう
-			がよい。
+
+			on_post_filter		*unite-source-attribute-hooks-on_post_filter*
+			filterが呼ばれ、候補が絞り込まれた後に呼ばれる。
+			パフォーマンスの影響を避けるため、絞り込まれた後に属性
+			をセットする際に使用する。
+			この関数は{args}と{context}を引数に取る。
 
 						*unite-source-attribute-action_table*
 action_table		辞書		(任意)
@@ -1107,7 +1384,7 @@ action_table		辞書		(任意)
 			を参照せよ。もしこれが与えられない場合、空となる。
 
 						*unite-source-attribute-default_action*
-default_action		文字列		(任意)
+default_action		辞書		(任意)
 			source独自の標準的なアクションを追加するときに使用する。
 			キーはアクションテーブルを追加するkindで、値は標準ア
 			クションである。これを省略した場合はkindの
@@ -1148,16 +1425,35 @@ is_volatile		数値		(任意)
 			閉じられるまで有効である。もっと長い時間キャッシュした
 			い場合はsourceが自前でキャッシュするほかない。
 
+						*unite-source-attribute-description*
 description		文字列		(任意)
 			sourceを説明する文字列。省略すると""になる。
 			|unite-source-source|において表示に使われる。
+
+						*unite-source-attribute-syntax*
+syntax			文字列		(任意)
+			source内で使用するsyntax名。ここで設定したsyntax名は
+			uniteによって自動的に定義される。省略すると""になる。
+			source独自のハイライトを設定する際に使用される。
+			他のsyntaxと被らないようにするため、
+			"uniteSource__(source名)"とする慣習となっている。
+			ハイライトの設定自体は、
+			|unite-source-attribute-hooks-on_syntax|を使用しなけ
+			ればならない。
+
+						*unite-source-attribute-source__*
+source__		不定		(任意)
+			source毎の独自属性。unite側の属性と被らないように、
+			source__プレフィクスを追加しなければならない。
 
 NOTATION					*unite-notation*
 
 {context}					*unite-notation-{context}*
 			コンテキスト情報を与える辞書変数。主に、次の情報を持つ。
-			|unite#get_context()|で取得できる。システムで共有さ
-			れているので、これを書き換えてはいけない。
+			グローバルなコンテキスト情報は|unite#get_context()|で取
+			得できる。コンテキスト情報は、source毎に独立して持って
+			いるため、ここにsource__で始まるキーを格納することで、
+			source独自の情報を格納することができる。
 
 			input			(文字列)
 				ユーザーの入力文字列。
@@ -1172,17 +1468,38 @@ NOTATION					*unite-notation*
 				uniteバッファが挿入モードから呼び出されたかどう
 				か。
 
+			immediately		(数値)
+				uniteバッファが|unite-options-immediately|によ
+				って呼び出されたかどうか。
+
 			is_redraw		(数値)
-				<Plug>(unite_redraw)で呼び出されたかどうか。
+				|<Plug>(unite_redraw)|で呼び出されたかどうか。
 				ユーザーが明示的にキャッシュを破棄しているので、
 				自前でキャッシュを管理するsourceにとっては重
 				要な情報となる。
 
+			is_async		(数値)
+				sourceが非同期に候補を収集するかどうか。
+				|unite-source-attribute-async_gather_candidates|
+				が存在する場合、1となる。これをsource内で明示的
+				に0にセットすると今後非同期では呼ばれなくなる。
+
 			source			(辞書)
 				現在候補を収集しているsourceの情報。
 
+			candidates		(リスト)
+				フィルタリング終了後の候補。
+				|unite-source-attribute-hooks-on_post_filter|内
+				でのみ有効。
+
 			winnr			(数値)
 				uniteを呼び出したウィンドウの番号。
+
+			source__{name}		(不定)		(任意)
+				source独自の付加情報。source側で自由に使用でき
+				る。複数回同じsourceを呼び出せるようにするため
+				s:変数ではなく、ここに情報を格納することが推
+				奨される。
 
 {candidate}					*unite-notation-{candidate}*
 			候補を表す辞書変数。次の情報を持つ。
@@ -1195,11 +1512,17 @@ NOTATION					*unite-notation*
 				画面に表示される候補を表す文字列。wordより優先
 				されるが、候補の絞り込みには使われない。
 
-			source			(文字列)
-				候補が所属するsource名。
+			source			(文字列)	(任意)
+				候補が所属するsource名。省略された場合、自動
+				的にセットされる。
 
 			kind			(文字列)	(任意)
 				候補が所属するkind名。省略すると"common"となる。
+
+			is_dummy		(数値)		(任意)
+				ダミー候補であるかどうか。省略すると0となる。
+				ダミー候補の場合、アクションや移動時に無視さ
+				れる。
 
 			source__{name}		(不定)		(任意)
 				source独自の付加情報。source側で自由に使用でき
@@ -1328,7 +1651,38 @@ actionの解決順序				*unite-action-resolution-order*
 (11) Custom action table for kind "common".
 (12) Default action table for kind "common".
 
-|unite-action-table|も参照せよ。
+==============================================================================
+filterの作成					*unite-create-filter*
+
+autoload/unite/filters/に*.vimのファイルを置いておくと、自動的に読み込まれる。
+その際、unite#filters#{filter_name}#define()が呼ばれ、戻り値がfilterと解釈される。
+戻り値はリストでもよく、その場合はfilterのリストと解釈される。
+filterを追加したくない場合は、空リストを返せば良い。
+独自のfilterを動的に追加するためには、|unite#define_filter()|を使う。
+
+------------------------------------------------------------------------------
+filterの属性					*unite-filter-attributes*
+
+						*unite-filter-attribute-name*
+name			文字列		(必須)
+			filterの名前。
+
+						*unite-filter-attribute-filter*
+filter			関数		(必須)
+			uniteが候補を収集した後、フィルタリングする際に呼ばれる。
+			この関数は{candidates}と{context}を引数に取り、
+			{candidate}のリストを返す。
+			{candidate}はsourceが
+			|unite-source-attribute-gather_candidates|で収集した
+			候補リスト、{context}はsourceが呼ばれたときのコンテ
+			キスト情報である。
+			{context}については|unite-notation-{context}|、
+			{candidate}については|unite-notation-{candidate}|を参照
+			せよ。
+
+						*unite-filter-attribute-description*
+description		文字列		(任意)
+			filterを説明する文字列。省略すると""になる。
 
 ==============================================================================
 設定例						*unite-examples*
@@ -1352,11 +1706,19 @@ actionの解決順序				*unite-action-resolution-order*
 	  imap <buffer> jj      <Plug>(unite_insert_leave)
 	  "imap <buffer> <C-w>     <Plug>(unite_delete_backward_path)
 	
+	  " <C-l>: manual neocomplcache completion.
+	  inoremap <buffer> <C-l>  <C-x><C-u><C-p><Down>
+	
 	  " Start insert.
 	  "let g:unite_enable_start_insert = 1
 	endfunction"}}}
 	
 	let g:unite_source_file_mru_limit = 200
+	let g:unite_cursor_line_highlight = 'TabLineSel'
+	let g:unite_abbr_highlight = 'TabLine'
+	
+	" For optimize.
+	let g:unite_source_file_mru_filename_format = ''
 	
 >
 ==============================================================================

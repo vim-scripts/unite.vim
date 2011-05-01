@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: bookmark.vim
+" FILE: matcher_glob.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 20 Aug 2010
+" Last Modified: 22 Apr 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -24,19 +24,52 @@
 " }}}
 "=============================================================================
 
-if exists('g:loaded_unite_source_bookmark')
-  finish
-endif
-
 let s:save_cpo = &cpo
 set cpo&vim
 
-command! -nargs=? -complete=file UniteBookmarkAdd call unite#sources#bookmark#_append(<q-args>)
+function! unite#filters#matcher_glob#define()"{{{
+  return s:matcher
+endfunction"}}}
 
-let g:loaded_unite_source_bookmark = 1
+let s:matcher = {
+      \ 'name' : 'matcher_glob',
+      \ 'description' : 'glob matcher',
+      \}
+
+function! s:matcher.filter(candidates, context)"{{{
+  if a:context.input == ''
+    return a:candidates
+  endif
+
+  let l:candidates = copy(a:candidates)
+
+  for l:input in split(a:context.input, '\\\@<! ')
+    let l:input = substitute(l:input, '\\ ', ' ', 'g')
+
+    if l:input =~ '^!'
+      " Exclusion.
+      let l:input = unite#escape_match(l:input)
+      call filter(l:candidates, 'v:val.word !~ ' . string(l:input[1:]))
+    elseif l:input =~ '\\\@<!\*'
+      " Wildcard.
+      let l:input = unite#escape_match(l:input)
+      call filter(l:candidates, 'v:val.word =~ ' . string(l:input))
+    else
+      let l:input = substitute(l:input, '\\\(.\)', '\1', 'g')
+      if &ignorecase
+        let l:expr = printf('stridx(tolower(v:val.word), %s) != -1', string(tolower(l:input)))
+      else
+        let l:expr = printf('stridx(v:val.word, %s) != -1', string(l:input))
+      endif
+
+      let l:candidates = filter(l:candidates, l:expr)
+    endif
+  endfor
+
+  return l:candidates
+endfunction"}}}
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
 
-" __END__
 " vim: foldmethod=marker

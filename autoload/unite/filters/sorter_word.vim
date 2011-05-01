@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: bookmark.vim
+" FILE: sorter_word.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 20 Aug 2010
+" Last Modified: 22 Apr 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -24,19 +24,23 @@
 " }}}
 "=============================================================================
 
-if exists('g:loaded_unite_source_bookmark')
-  finish
-endif
-
 let s:save_cpo = &cpo
 set cpo&vim
 
-command! -nargs=? -complete=file UniteBookmarkAdd call unite#sources#bookmark#_append(<q-args>)
+function! unite#filters#sorter_word#define()"{{{
+  return s:sorter
+endfunction"}}}
 
-let g:loaded_unite_source_bookmark = 1
+let s:sorter = {
+      \ 'name' : 'sorter_word',
+      \ 'description' : 'sort by word order',
+      \}
+
+function! s:sorter.filter(candidates, context)"{{{
+  return unite#util#sort_by(a:candidates, 'v:val.word')
+endfunction"}}}
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
 
-" __END__
 " vim: foldmethod=marker

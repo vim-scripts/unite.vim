@@ -1,6 +1,6 @@
 *unite.txt*	Unite all sources
 
-Version: 1.0
+Version: 2.0
 Author : Shougo <Shougo.Matsu@gmail.com>
 Documentation Author: ujihisa <ujihisa at gmail com>
 License: MIT license  {{{
@@ -33,13 +33,15 @@ Interface		|unite-interface|
   Variables		  |unite-variables|
     Sources variables	    |unite-sources-variables|
   Key mappings		  |unite-key-mappings|
-  Functions		  |unite-functins|
-  source		  |unite-source|
-  kind			  |unite-kind|
-  Actions		  |unite-action|
+  Functions		  |unite-functions|
+  Sources		  |unite-sources|
+  Kinds			  |unite-kinds|
+  Actions		  |unite-actions|
+  Filters		  |unite-filters|
 Configulation Examples	|unite-examples|
 Create source		|unite-create-source|
 Create kind		|unite-create-kind|
+Create filter		|unite-create-filter|
 User defined source	|unite-user-sources|
 ToDo			|unite-todo|
 Bugs			|unite-bugs|
@@ -181,9 +183,16 @@ COMMANDS 					*unite-commands*
 		Specifies a default action. The default value is 'default'.
 
 						*unite-options-start-insert*
+						*unite-options-no-start-insert*
 		-start-insert
-		Opens unite with narrowing mode. Otherwise the initial mode
-		will be Normal mode.
+		Opens unite buffer with narrowing mode.
+
+		-no-start-insert
+		Opens unite buffer with normal mode.
+
+		When both options are undefined, this will depend on
+		|g:unite_enable_start_insert| option.
+		The behavior when both options are defined is undefined.
 
 						*unite-options-no-quit*
 		-no-quit
@@ -200,6 +209,43 @@ COMMANDS 					*unite-commands*
 		-winheight={window-height}
 		Specifies the height of a unite buffer.  Unless you specify
 		it, |g:unite_winheight| will be used.
+
+						*unite-options-immediately*
+		-immediately
+		If the number of candidates is exactly one, it runs default
+		action immediately. If candidate is empty, it doesn't open
+		unite buffer.
+
+						*unite-options-auto-preview*
+		-auto-preview
+		When you selected candidate, it runs "preview" action
+		automatically.
+
+						*unite-options-completion*
+		-completion
+		Uses unite completion interface. |unite-options-col| is also
+		required.
+
+						*unite-options-col*
+		-col={column-number}
+		Specifies the called unite buffer position.
+
+						*unite-options-vertical*
+		-vertical
+		Splits unite window vertically.
+
+						*unite-options-horizontal*
+		-horizontal
+		Splits unite window horizontally.
+		
+		When both options are undefined, this will depend on
+		|g:unite_enable_split_vertically| option.
+		The behavior when both options are defined is undefined.
+
+						*unite-options-direction*
+		-direction={direction}
+		Defines split position rule. The default value is same to
+		|g:unite_split_rule|.
 
 :UniteWithCurrentDir [{options}] {sources}	*:UniteWithCurrentDir*
 		Equivalent to |:Unite| except that the initial narrowing text
@@ -241,58 +287,57 @@ g:unite_enable_start_insert			*g:unite_enable_start_insert*
 
 		Default value is 0.
 
-g:unite_enable_ignore_case			*g:unite_enable_ignore_case*
-		Ignores case when the value is 1.
-
-		Default value is same to 'ignorecase' option.
-
-g:unite_enable_smart_case			*g:unite_enable_smart_case*
-		Distinguish capitals from smalls when the narrowing text has a
-		capital letter if this variable is 1.
-		
-		Default value is same to 'infercase'.
-
 g:unite_split_rule				*g:unite_split_rule*
 		Defines split position rule.
 
 		Default value is "topleft".
 
-g:unite_enable_split_vertically				*g:unite_enable_split_vertically*
+g:unite_enable_split_vertically			*g:unite_enable_split_vertically*
 		If this option is 1, splits unite window vertically.
 
 		Default value is 0; unite window will be splat horizontally.
 
-g:unite_winheight					*g:unite_winheight*
+g:unite_winheight				*g:unite_winheight*
 		The height of unite window when it's split horizontally.  It's
 		ignored in splitting vertically.
 
 		The default value is 20.
 
-g:unite_winwidth					*g:unite_winwidth*
+g:unite_winwidth				*g:unite_winwidth*
 		The width of unite window when it's split vertically.  It's
 		ignored in splitting horizontally.
 
 		The default value is 90.
 
-g:unite_cd_command					*g:unite_cd_command*
+g:unite_cd_command				*g:unite_cd_command*
 		Specifies the Vim command for cd action.
 		This command must interpret |`=|.
 
 		The default value is "cd".
 
-g:unite_lcd_command					*g:unite_lcd_command*
+g:unite_lcd_command				*g:unite_lcd_command*
 		Specifies the Vim command for lcd action.
 		This command must interpret |`=|.
 
 		The default value is "lcd".
 
-g:unite_quick_match_table				*g:unite_quick_match_table*
-		The table of completion candidates of quick mtch list,
+g:unite_cursor_line_highlight			*g:unite_cursor_line_highlight*
+		Specifies the cursor line highlight.
+		
+		The default value is "PmenuSel".
+
+g:unite_abbr_highlight				*g:unite_abbr_highlight*
+		Specifies candidates abbr highlight.
+		
+		The default value is "Pmenu".
+
+g:unite_quick_match_table			*g:unite_quick_match_table*
+		The table of completion candidates of quick match list,
 		corresponding the narrowing text.
 
 		The default value is complex; so see plugin/unite.vim.
 
-g:unite_data_directory					*g:unite_data_directory*
+g:unite_data_directory				*g:unite_data_directory*
 		Specifies directories for configurations internally used in
 		unite itself or its sources.  If the directory doesn't exist
 		the directory will be automatically generated.  For example source
@@ -302,19 +347,19 @@ g:unite_data_directory					*g:unite_data_directory*
 		Default value is expand('~/.unite'); the absolute path of it.
 
 g:unite_no_default_keymappings			*g:unite_no_default_keymappings*
-		If it's 1, unite doesn't map any defauilt key mappings.  You
+		If it's 1, unite doesn't map any default key mappings.  You
 		shouldn't enable this option without any strong reasons.
 
 		This variable doesn't exist unless you define explicitly.
 
-SOURCES VARIABLES 					*unite-sources-variables*
+SOURCES VARIABLES 				*unite-sources-variables*
 
 g:unite_source_file_ignore_pattern		*g:unite_source_file_ignore_pattern*
 		Specifies a regex pattern for ignoring some specific
 		candidates in which source is file.  This matches on the full
 		path of each files.  If the variable isn't empty string, unite
 		filters with the regex pattern on the results.  It depends on
-		'ignorecase' to distinguish cases or not.
+		|g:unite_enable_ignore_case| to distinguish cases or not.
 
 		Refer autoload/unite/sources/file.vim about the default value.
 
@@ -322,7 +367,7 @@ g:unite_source_file_mru_time_format		*g:unite_source_file_mru_time_format*
 		Specifies the output format of the last access time of
 		|unite-source-file_mru|.  The format is same to |strftime()|.
 
-		Default value is "(%c)".
+		Default value is "(%c) ".
 
 g:unite_source_file_mru_filename_format		*g:unite_source_file_mru_filename_format*
 		Specifies the output format of the filename of
@@ -348,7 +393,7 @@ g:unite_source_file_mru_ignore_pattern		*g:unite_source_file_mru_ignore_pattern*
 		|unite-source-file_mru|.  This applies on the full path of
 		each files.  Unless this variable value is an empty string,
 		Unite filters out the result with the regexp.  Regardless of
-		'ignorecase' value, it's case sensitive.
+		|g:unite_enable_ignore_case| value, it's case sensitive.
 
 		Refer autoload/unite/sources/file_mru.vim about the default
 		value.
@@ -366,11 +411,15 @@ g:unite_source_bookmark_file			*g:unite_source_bookmark_file*
 
 		Default value is |g:unite_data_directory|; '/.bookmark'. 
 
-g:unite_source_file_rec_max_depth		*g:unite_source_file_rec_max_depth*
-		Specifies the maximum directory depth that 
-		|unite-source-file_rec| searches.
+g:unite_source_file_rec_ignore_pattern		*g:unite_source_file_rec_ignore_pattern*
+		Specifies the regexp pattern to ignore candidates of
+		|unite-source-file_rec|.  This applies on the full path of
+		each files.  Unless this variable value is an empty string,
+		Unite filters out the result with the regexp.  Regardless of
+		|g:unite_enable_ignore_case| value, it's case sensitive.
 
-		Default is 10.
+		Refer autoload/unite/sources/file_rec.vim about the default
+		value.
 
 KINDS VARIABLES					*unite-kinds-variables*
 
@@ -395,6 +444,9 @@ Normal mode mappings.
 
 <Plug>(unite_exit)				*<Plug>(unite_exit)*
 		Exits unite.
+
+<Plug>(unite_restart)				*<Plug>(unite_restart)*
+		Restarts unite.
 
 <Plug>(unite_do_default_action)			*<Plug>(unite_do_default_action)*
 		Runs the default action of the default candidates.  The kinds
@@ -444,7 +496,7 @@ Normal mode mappings.
 		Changes the order of source reversely.
 
 <Plug>(unite_print_candidate)			*<Plug>(unite_print_candidate)*
-		Shows the target of the action of the selected candiate.  For
+		Shows the target of the action of the selected candidate.  For
 		example this shows the content of the candidate when the
 		kind of the candidate you selected is |word|.
 
@@ -464,6 +516,9 @@ Normal mode mappings.
 
 <Plug>(unite_input_directory)			*<Plug>(unite_input_directory)*
 		Narrows with inputting directory name.
+
+<Plug>(unite_delete_backward_path)		*<Plug>(unite_delete_backward_path)*
+		Deletes a path upward. Refer to |i_<Plug>(unite_delete_backward_path)|.
 
 Insert mode mappings.
 
@@ -538,12 +593,14 @@ I		|<Plug>(unite_insert_head)|
 a		|<Plug>(unite_append_enter)|
 A		|<Plug>(unite_append_end)|
 q		|<Plug>(unite_exit)|
+<C-r>		|<Plug>(unite_restart)|
 <Space>		|<Plug>(unite_toggle_mark_current_candidate)|
 <Tab>		|<Plug>(unite_choose_action)|
 <C-n>		|<Plug>(unite_rotate_next_source)|
 <C-p>		|<Plug>(unite_rotate_previous_source)|
 <C-g>		|<Plug>(unite_print_candidate)|
 <C-l>		|<Plug>(unite_redraw)|
+<C-h>		|<Plug>(unite_delete_backward_path)|
 gg		|<Plug>(unite_cursor_top)|
 j		|<Plug>(unite_loop_cursor_down)|
 <Down>		|<Plug>(unite_loop_cursor_down)|
@@ -593,7 +650,7 @@ FUNCTIONS					*unite-functions*
 
 CORE						*unite-functions-core*
 
-unite#available_kinds([{kind-name}])		*unite#available_kinds()*
+unite#get_kinds([{kind-name}])			*unite#get_kinds()*
 			Gets the kinds of {kind-name}.  Unless they exist this
 			returns an empty dictionary.  This returns a
 			dictionary which keys are kind names and values are
@@ -601,7 +658,7 @@ unite#available_kinds([{kind-name}])		*unite#available_kinds()*
 
 			Changing the return value is not allowed.
 
-unite#available_sources([{source-name}])	*unite#available_sources()*
+unite#get_sources([{source-name}])		*unite#get_sources()*
 			Gets the source of {source-name}. Unless they exist
 			this returns an empty dictionary.  This returns a
 			dictionary which keys are source names and values are
@@ -611,7 +668,7 @@ unite#available_sources([{source-name}])	*unite#available_sources()*
 
 CUSTOMS						*unite-functions-customs*
 
-unite#start({sources}, [, {context}])				*unite#start()*
+unite#start({sources}, [, {context}])		*unite#start()*
 		Creates a new Unite buffer.  In case when you are already on a
 		Unite buffer, the narrowing text will be preserved.
 
@@ -623,12 +680,12 @@ unite#start({sources}, [, {context}])				*unite#start()*
 		Refer |unite-notation-{context}| about {context}.  If you
 		skipped it will use the default value.
 
-unite#get_context()						*unite#get_context()*
+unite#get_context()				*unite#get_context()*
 		Gets the context information of the current Unite buffer.
 		This is used by functions like |unite#custom_action()| to call
 		|unite#start()| internally.
 
-unite#do_action({action-name})					*unite#do_action()*
+unite#do_action({action-name})			*unite#do_action()*
 		Returns the key sequence for running {action-name} action for
 		the marked candidates.  This function works only when Unite is
 		already activated.  This causes a runtime error if
@@ -648,7 +705,7 @@ unite#do_action({action-name})					*unite#do_action()*
 >
 		nnoremap <silent><buffer><expr> <C-k> unite#do_action('preview')
 >
-unite#smart_map({narrow-map}, {select-map})			*unite#smart_map()*
+unite#smart_map({narrow-map}, {select-map})	*unite#smart_map()*
 		Returns the key sequence which works both modes of narrowing
 		and selecting with respect to the given narrow-map and select-map.
 		Use this with |unite#do_action()|.  This will be used with
@@ -684,14 +741,30 @@ unite#set_substitute_pattern({buffer-name}, {pattern}, {subst} [, {priority}])
 		which buffer_name is files, it adds a wildcard in order to
 		match ~ as $HOME and to match partially /.
 >
-		call unite#set_substitute_pattern('files', '^\~', substitute(substitute($HOME, '\\', '/', 'g'), ' ', '\\\\ ', 'g'), -100)
-		call unite#set_substitute_pattern('files', '[^~.*]\zs/', '*/*', 100)
+		call unite#set_substitute_pattern('files', '^\~',
+		\ substitute(unite#util#substitute_path_separator($HOME), ' ', '\\\\ ', 'g'), -100)
+		call unite#set_substitute_pattern('files', '[^~.*]\ze/', '\0*', 100)
+		call unite#set_substitute_pattern('files', '/\ze[^~.*]', '/*', 100)
 <
 unite#get_substitute_pattern({buffer-name})
 						*unite#get_substitute_pattern()*
 		Gets the substitute pattern for narrowing text of a Unite buffer
 		name {buffer-name}.  This causes an error if the substitute
 		pattern of {buffer-name}.  This is for debugging.
+
+unite#set_buffer_name_option({buffer-name}, {option-name}, {value})
+						*unite#set_buffer_name_option()*
+		Set {buffer-name} specialized {option-name} to {value}.
+		
+		This options is available:
+		
+		substitute_patterns		(Dictionary)
+		
+		filters				(List)
+		
+		ignorecase			(Number)
+		
+		smartcase			(Number)
 
 unite#custom_default_action({kind}, {default-action})
 						*unite#custom_default_action()*
@@ -719,7 +792,7 @@ unite#custom_action({kind}, {name}, {action})
 		call unite#custom_action('file,buffer', 'tabopen', my_tabopen)
 		unlet my_tabopen
 <
-unite#undef_custom_action({kind}, {name})			*unite#undef_custom_action()*
+unite#undef_custom_action({kind}, {name})	*unite#undef_custom_action()*
 		Deletes an action which name is {name} of {kind} that you
 		added with using |unite#custom_action()|.  You may specify
 		multiple {kind} with separating ",".  This function doesn't do
@@ -727,14 +800,19 @@ unite#undef_custom_action({kind}, {name})			*unite#undef_custom_action()*
 
 unite#custom_alias({kind}, {name}, {action})
 						*unite#custom_alias()*
-		{kind}に対する{action}の別名である、{name}というアクションを定
-		義する。アクションに短縮名を付けたい場合に便利。
-		{kind}は","区切りで複数指定ができる。
-		{action}を"nop"とすると、そのアクションは無効化される。
-		例:
+		Define action {kind} is another name of {name} in {kind}.  You
+		may specify multiple {kind} with separating ",".  If {action}
+		is "nop", such action is disabled.
+		example:
 >
 		call unite#custom_alias('file', 'h', 'left')
 <
+unite#custom_filters({source-name}, {filters})	*unite#custom_filters()*
+		Changes the filters of {source-name} into {filters}.  You
+		may specify multiple sources with separating "," in
+		{source-name}.  {filters} is a name of filter or a list of
+		the names.
+
 unite#take_action({action-name}, {candidate})
 						*unite#take_action()*
 		Runs an action {action-name} against {candidate}.  This will
@@ -745,18 +823,23 @@ unite#take_action({action-name}, {candidate})
 unite#take_parents_action({action-name}, {candidate}, {extend-candidate})
 						*unite#take_parents_action()*
 		Same to |unite#take_action()| but searches the parents' action
-		table with combining {extend-candiate} on {candidate}.  This
+		table with combining {extend-candidate} on {candidate}.  This
 		is handy for reusing parents' actions.
 
 unite#define_source({source})			*unite#define_source()*
-		Adds {source} dinamically.  See also |unite-create-source|
-		about the detail of source.  If a source which name is same,
-		that will be overwritten.
+		Adds {source} dynamically.  See also |unite-create-source|
+		about the detail of source.  If a source which name is same
+		exists, that will be overwritten.
 
 unite#define_kind({kind})			*unite#define_kind()*
-		Adds {kind} dinamically.  See also |unite-create-kind|
-		about the detail of kind.  If a kind which name is same,
-		that will be overwritten.
+		Adds {kind} dynamically.  See also |unite-create-kind|
+		about the detail of kind.  If a kind which name is same
+		exists, that will be overwritten.
+
+unite#define_filter({filter})			*unite#define_filter()*
+		Adds {filter} dynamically.  See also |unite-create-filter|
+		about the detail of filter.  If a filter which name is same
+		exists, that will be overwritten.
 
 unite#undef_source({name})			*unite#undef_source()*
 		Removes the source which name is {name} that was added by
@@ -768,8 +851,13 @@ unite#undef_kind({name})			*unite#undef_kind()*
 		|unite#define_kind()|.  If such a kind doesn't exist, this
 		function doesn't do anything.
 
+unite#undef_filter({name})			*unite#undef_filter()*
+		Removes the filter which name is {name} that was added by
+		|unite#define_filter()|.  If such a filter doesn't exist,
+		this function doesn't do anything.
+
 ==============================================================================
-SOURCE						*unite-source*
+SOURCES						*unite-sources*
 
 						*unite-source-file*
 file		Nominates an input file as a candidate.
@@ -785,9 +873,12 @@ directory_mru	Nominates directories you used recently as candidates,
 						*unite-source-file_rec*
 file_rec	Nominates all directory or file names of input narrowing text
 		under the current directly as candidates.  This may get Vim
-		frozen when there are too many candidates.
+		frozen when there are too many candidates. The candidates is
+		cached by file_rec source. If you clear cache, use
+		|<Plug>(unite_redraw)| keymapping.
 
-		You may pass the narrowing text as an argument of sourc e.
+		Source arguments:
+		1. the narrowing text.
 
 						*unite-source-buffer*
 buffer		Nominates opened buffers as candidates, ordering by time
@@ -805,6 +896,9 @@ tab		Nominates opened tabs as candidates, regarding t:cwd as the
 		If t:title exists, this will be used as "word" for narrowing.
 		Otherwise, the buffer name of the current tab will be used.
 
+		Source arguments:
+		1. "no-current" remove current tab from candidates.
+
 						*unite-source-register*
 register	Nominates the strings stored in registers as candidates.
 
@@ -818,11 +912,26 @@ source		Nominates Unite source names themselves as candidates.
 		current Unite buffer context.
 
 						*unite-source-window*
-window		Nominates opend windows as candidates, ordering by time
+window		Nominates opened windows as candidates, ordering by time
 		series.
 
+		Source arguments:
+		1. "no-current" remove current window from candidates.
+
+						*unite-source-output*
+output		Nominates executed Vim command as candidates.
+
+		Source arguments:
+		1. Vim command.
+
+						*unite-source-command*
+command		Nominates Vim Ex commands as candidates.
+
+						*unite-source-mapping*
+mapping		Nominates Vim mappings as candidates.
+
 ==============================================================================
-KIND						*unite-kind*
+KINDS						*unite-kinds*
 
 						*unite-kind-common*
 common		A kind for common actions.  Almost all kinds inherit this
@@ -839,8 +948,8 @@ cdable		An interface that can cd.
 				The target directory
 
 						*unite-kind-file*
-file		An inteface for files.  This kind is inheriting cdable and
-		openable, so this requries kinds that they require.
+file		An interface for files.  This kind is inheriting cdable and
+		openable, so this requires kinds that they require.
 
 			action__path		(String)	(Required)
 				The path of the target directory
@@ -862,7 +971,7 @@ tab		An interface for tabs.  If you can use |gettabvar()|, since this
 
 						*unite-kind-directory*
 directory	An interface for directories.  This kind is inheriting file,
-		this requires keys it requries.
+		this requires keys it requires.
 
 						*unite-kind-word*
 word		A String that you can insert
@@ -923,17 +1032,155 @@ window		An interface for Windows of Vim
 			action__window_nr	(String)	(Required)
 				The target window number
 
+						*unite-kind-completion*
+completion	An interface for completion
+
+			action__complete_word	(String)	(Required)
+				The completion word
+
+			action__complete_pos	(Number)	(Required)
+				The completion position
+
+			action__complete_info	(String)	(Optional)
+				The completion information
+
 ==============================================================================
-ACTIONS						*unite-action*
+ACTIONS						*unite-actions*
+
+Actions of each kinds
+
+common					*unite-action-common*
+Defines the common interface for all kinds.  This uses condidate.word
+internally.
+	nop		Do nothing
+	yank		Yank the candidate text
+	yank_escape	Yank the escaped candidate text
+	ex		Input the escaped candidate text into command line
+	insert		Input the candidate text into the current buffer
+
+openable					*unite-action-openable*
+Defines an interface for files you can open.  This requires an inheriting kind
+to define open action.
+	tabopen		Open the file in a new tab
+	split		Open the file, splitting horizontally
+	vsplit		Open the file, splitting vertically
+	left		Open the file in the left, splitting vertically
+	right		Open the file in the right, splitting vertically
+	above		Open the file in the top, splitting horizontally
+	below		Open the file in the bottom, splitting horizontally
+
+cdable					*unite-action-cdable*
+Defines an interface for files you can move to with cd command.
+	cd		Change the current directory.
+	lcd		Change the current directory of the current window.
+	project_cd	Look for the project directory, and changes the
+			current directory there.
+	narrow		Narrow down candidates by the directory name
+	vimshell	Run |vimshell| on the directory.  This is available
+			only when you already installed |vimshell|.
+	tabvimshell	Run |:VimShellTab| on the directory.  This is
+			available only when you already installed |vimshell|.
+	vimfiler	Run |vimfiler| on the directory.  This is available
+			only when you already installed |vimfiler|.
+	tabvimfiler	Run |:VimFilerTab| on the directory.  This is
+			available only when you already installed |vimfiler|.
+	rec		Run |unite-source-file_rec| on the directory.
+
+file						*unite-action-file*
+Opens a file into a new buffer.  This kind extends |unite-action-openable| and
+|unite-action-cdable|.
+	open		Open the file
+	preview		Open the file into preview window
+	bookmark	Add the file into your bookmark
+	mkdir		Make directory. If exists file, this action is invalid.
+
+buffer						*unite-action-buffer*
+This kind extends |unite-action-file|.
+	delete		|:bdelete| the buffer
+	fdelete		|:bdelete!| the buffer
+	wipeout		|:bwipeout| the buffer
+	unload		|:bunload| the buffer
+	bookmark	Add the candidate into your bookmark
+
+tab						*unite-action-tab*
+This kind extends actions of |unite-action-cdable| only when |gettabvar()|
+exists.
+	open		Show the tab
+	delete		Close the tab
+	
+	The following action requires |gettabvar()| and t:cwd.
+	rename		Change the title of the tab
+
+directory					*unite-action-directory*
+This kind extends actions of |unite-action-file|.  This doesn't have any
+additional actions.  You may want to use this to change the default_action
+when the target is a directory.
+
+word						*unite-action-word*
+This kind doesn't have any additional actions.  You may want to use this to
+change the default_action when the target is a word.
+
+jump_list					*unite-action-jump_list*
+This kind extends actions of |unite-action-openable|.  Let me explain about
+the additional actions defined in this.
+	open		Jump to the location of the candidate
+	preview		Preview around the location of the candidate
+
+command						*unite-action-command*
+	execute		Execute the command
+	edit		Input the command into command line
+
+window						*unite-action-window*
+This kind extends ctions of |unite-action-cdable|.
+	open		Move to the window
+	delete		Close the window
+	only		Close all windows besides the window
+
+completion					*unite-action-completion*
+	insert		Insert the candidate
+	preview		Show the information of the candidate
+
+Actions of each sources
+
+file_mru					*unite-action-file_mru*
+	delete		Delete from most recent used file candidates
+
+directory_mru					*unite-action-directory_mru*
+	delete		Delete from most recent used directory candidates
+
+bookmark					*unite-action-bookmark*
+	delete		Delete from bookmark file candidates
+
+						*unite-default-action*
+Default actions
+
+kind		action
+{kind}		{action}
+----------	----------
+file		open
+buffer		open
+tab		open
+directory	narrow
+word		insert
+jump_list	open
+
+==============================================================================
+FILTERS						*unite-filters*
+
+TODO
 
 ==============================================================================
 CREATE SOURCE					*unite-create-source*
 
+TODO
+
 ------------------------------------------------------------------------------
 SOURCE ATTRIBUTES				*unite-source-attributes*
 
+TODO
+
 						*unite-source-attribute-name*
-name			string		(requried)
+name			string		(required)
 			The name of a source. It must consist of the following
 			characters:
 			- a-z
@@ -965,6 +1212,13 @@ required_pattern_length	number		(optional)
 ==============================================================================
 CREATE KIND					*unite-create-kind*
 
+TODO
+
+==============================================================================
+CREATE FILTER					*unite-create-filter*
+
+TODO
+
 ==============================================================================
 EXAMPLES					*unite-examples*
 >
@@ -987,11 +1241,19 @@ EXAMPLES					*unite-examples*
 	  imap <buffer> jj      <Plug>(unite_insert_leave)
 	  "imap <buffer> <C-w>     <Plug>(unite_delete_backward_path)
 	
+	  " <C-l>: manual neocomplcache completion.
+	  inoremap <buffer> <C-l>  <C-x><C-u><C-p><Down>
+	
 	  " Start insert.
 	  "let g:unite_enable_start_insert = 1
 	endfunction"}}}
 	
 	let g:unite_source_file_mru_limit = 200
+	let g:unite_cursor_line_highlight = 'TabLineSel'
+	let g:unite_abbr_highlight = 'TabLine'
+	
+	" For optimize.
+	let g:unite_source_file_mru_filename_format = ''
 	
 >
 ==============================================================================
@@ -1008,6 +1270,314 @@ BUGS						*unite-bugs*
 
 ==============================================================================
 CHANGELOG					*unite-changelog*
+
+2011-05-01
+- Ver.2.0 is released.
+
+------------------------------------------------------------------------------
+ChangeLog unite.vim Ver.2.0:
+
+2011-04-28
+- Fixed unite source.
+
+2011-04-27
+- Refactored a bit.
+
+2011-04-26
+- Implemented position restore.
+- Improved auto preview behavior.
+- Implemented mapping source.
+
+2011-04-25
+- Fixed file_mru error.
+
+2011-04-22
+- Set cpoptions.
+- Improved file_rec source.
+
+2011-04-21
+- Fixed redraw candidates bug.
+
+2011-04-20
+- Fixed default action bug.
+
+2011-04-17
+- Improved auto preview.
+- Ignore invalid action.
+- Improved source file.
+- Improved loop cursor down/up.
+- Implemented dummy candidates.
+
+2011-04-16
+- Fixed auto preview bug.
+
+2011-04-15
+- Supported yanktmp in register source.
+
+2011-04-13
+- Added ignorecase and smartcase buffer_name options.
+- Fixed help.
+
+2011-04-12
+- Fixed quick match bug.
+- Fixed choose action.
+- Improved redraw.
+- Improved source file dummy candidates.
+
+2011-04-09
+- Improved file_rec source.
+- Caching file_rec source.
+- Fixed narrowing action.
+
+2011-04-07
+- Fixed hlsearch bug.
+- Fixed sidescrolloff problem.
+- Added is_async context flag.
+
+2011-04-04
+- Fixed quick match error.
+- Improved default substitute pattern.
+
+2011-04-03
+- Improved unite action.
+
+2011-04-02
+- Fixed :UniteResume bug.
+- Improved unite action.
+- Fixed choose action.
+
+2011-04-01
+- Fixed get action table bug.
+- Fixed priority sort bug.
+- Fixed narrowing.
+- Improved file source.
+- Implemented auto mkdir().
+- Implemented mkdir action.
+
+2011-03-31
+- Improved sort.
+- Optimized initialization.
+- Improved truncate.
+- Added post_filter hook.
+- Improved file_mru source.
+- Improved directory_mru source.
+- Fixed choose_action documentation.
+- Add '..' directory in unite source.
+
+2011-03-29
+- Implemented unite action source.
+- Changed unite#loaded_source_names_with_args().
+- Added sorter_word.
+- Improved redraw.
+- Fixed highlight settings.
+
+2011-03-25
+- Implemented vimfiler and tabvimfiler actions.
+- Improved documentation.
+- Fixed highlight.
+- Changed on_close timing.
+
+2011-03-23
+- Fixed kind completion bug.
+
+2011-03-22
+- Fixed unite#custom_filters() bug.
+- Ommitable candidates source name.
+
+2011-03-17
+- Implemented unite#clear_message().
+- Added README.
+- Implemented source highlight.
+
+2011-03-16
+- Added matcher_default, sorter_default, converter_default.
+
+2011-03-13
+- Improved delete buffer action.
+- Fixed unite#custom_filters() error.
+- Fixed help typo.
+- Renamed unite#custom_filter() to unite#custom_filters().
+- Added filter help.
+- Added unite#set_buffer_name_option() help.
+
+2011-03-10
+- Implemented filters.
+- Refactored buffer name options.
+- Implemented buffer name filters.
+- Fixed version number.
+
+2011-03-02
+- Improved file_rec path.
+- Improved buffer abbr.
+
+2011-02-25
+- Fixed context bug.
+- Fixed narrowing.
+- Added unite-source-attribute-source__ description.
+- Changed available_xxx API names to get_xxx.
+
+2011-02-24
+- Improved unite#print_error() and unite#print_message().
+- Implemented input_gather_candidates().
+- Fixed narrowing bug.
+- Changed input_gather_candidates() to change_candidates().
+- gather_candidates attribute is optional.
+- Changed file_rec message format.
+- Improved syntax.
+
+2011-02-23
+- Fixed auto_preview.
+- Fixed set search pattern.
+- Deleted highlight off.
+
+2011-02-22
+- Fixed narrowing bugs.
+
+2011-02-21
+- Fixed fnamemodify().
+- Improved traverse message in file_rec source.
+- Fixed file_rec path problem.
+
+2011-02-18
+- Fixed source file path problem.
+
+2011-02-16
+- Fixed source register max width.
+- Improved syntax.
+
+2011-02-14
+- Added -vertical, -horizontal, -direction options.
+
+2011-02-13
+- Implemented preview window check.
+- Improved initialize sources.
+
+2011-02-11
+- Implemented sorter and matcher.
+- Implemented unite#print_message().
+
+2011-02-10
+- Changed volatile source.
+- Added default matcher.
+- Added from field in action.
+
+2011-02-09
+- Improved file_rec source.
+- Added g:unite_source_file_rec_ignore_pattern option.
+
+2011-02-08
+- Fixed file_rec index.
+
+2011-02-07
+- Implemented asynchronous get candidates.
+- Improved file_rec.
+
+2011-02-06
+- Fixed redraw buffer source bug.
+- Added <Plug>(unite_restart) keymapping.
+
+2011-02-05
+- Fixed unite buffer name.
+
+2011-02-04
+- Fixed is_insert error.
+- Fixed completion kind.
+- Improved completion kind.
+
+2011-02-03
+- Fixed filtering bug.
+- Added completion kind.
+- Added col and completion option.
+
+2011-02-02
+- Improved syntax.
+- Improved highlight off.
+
+2011-02-01
+- Don't save directory in file_mru.
+- Fixed unite-command.
+- Implemented -auto-preview option.
+
+2011-01-31
+- Fixed substitute input.
+- Fixed buffer source.
+
+2011-01-30
+- Added no-current option in window and tab source.
+- Added <Plug>(unite_delete_backward_path) keymapping.
+- Improved normal mode redraw.
+- Refactored.
+- Added -immediately option.
+
+2011-01-28
+- Improved unite-register.
+- Improved narrowing behavior.
+
+2011-01-27
+- Improved jump_list.
+
+2011-01-26
+- Deleted :NeoComplCacheCachingBuffer.
+- Improved quick match message.
+- Chomp last /.
+
+2011-01-24
+- Added --no-start-insert option.
+
+2011-01-21
+- Fixed unite-register freeze bug.
+
+2011-01-20
+- Fixed is_redraw bug.
+
+2011-01-19
+- Added unite#version().
+- Fixed context.
+- Improved initialize.
+
+2011-01-17
+- Improved unite-command.
+- Improved command narrow action.
+- Use strdisplaywidth().
+- Add history in kind command.
+- Fixed :NeoComplCacheCachingBuffer error.
+- Improved context.
+- Improved rotate sources.
+- Improved args.
+- Improved syntax.
+
+2011-01-16
+- Improved command source.
+- Fixed jump_list escape.
+
+2011-01-15
+- Improved command action.
+- Added command source.
+
+2011-01-14
+- Fixed escape jump_list.
+- Fixed unite#get_default_action().
+- Improved unite-output.
+- Added edit action in command kind.
+
+2011-01-11
+- Changed :UniteWithInputDirectory behavior.
+- Deleted unused tag.
+
+2011-01-10
+- Changed yank action.
+- Added output source.
+- Fixed help typo.
+- Improved source arguments description.
+
+2011-01-09
+- Ver.1.1 development is started.
+- Improved insert leave.
+- Supported neocomplcache manual completion.
+- Added g:unite_cursor_line_highlight and g:unite_abbr_highlight options.
+
+------------------------------------------------------------------------------
+ChangeLog unite.vim Ver.1.0:
 
 2011-01-08
 - Optimized file_mru.
@@ -1464,7 +2034,7 @@ CHANGELOG					*unite-changelog*
 - Fixed unite buffer restore bug.
 
 ------------------------------------------------------------------------------
-Ver.0.5
+ChangeLog unite.vim Ver.0.5
 2010-09-21
 - Ver.0.5 is released.
 - Fixed japanese documentation.
@@ -1546,7 +2116,7 @@ Ver.0.5
 - Improved caching.
 
 ------------------------------------------------------------------------------
-Ver.0.1
+ChangeLog unite.vim Ver.0.1
 2010-09-10
 - Improved UniteWithBufferDir and UniteWithCurrentDir.
 

@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: unite.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 17 Nov 2010
+" Last Modified: 01 May 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -22,12 +22,15 @@
 "     TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 "     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 " }}}
-" Version: 1.0, for Vim 7.0
+" Version: 2.0, for Vim 7.0
 "=============================================================================
 
 if exists('g:loaded_unite')
   finish
 endif
+
+let s:save_cpo = &cpo
+set cpo&vim
 
 " Global options definition."{{{
 if !exists('g:unite_update_time')
@@ -67,11 +70,17 @@ endif
 if !exists('g:unite_lcd_command')
   let g:unite_lcd_command = 'lcd'
 endif
+if !exists('g:unite_abbr_highlight')
+  let g:unite_abbr_highlight = 'Pmenu'
+endif
+if !exists('g:unite_cursor_line_highlight')
+  let g:unite_cursor_line_highlight = 'PmenuSel'
+endif
 if !exists('g:unite_data_directory')
   let g:unite_data_directory = expand('~/.unite')
 endif
 if !isdirectory(fnamemodify(g:unite_data_directory, ':p'))
-  call mkdir(fnamemodify(g:unite_data_directory, ':p'), 'p')
+  call mkdir(iconv(fnamemodify(g:unite_data_directory, ':p'), &encoding, &termencoding), 'p')
 endif
 "}}}
 
@@ -135,7 +144,7 @@ function! s:call_unite_input_directory(args)"{{{
   let [l:args, l:options] = s:parse_options(a:args)
   if !has_key(l:options, 'input')
     let l:path = unite#substitute_path_separator(input('Input narrowing directory: ', '', 'dir'))
-    if l:path !~ '/$'
+    if isdirectory(l:path) && l:path !~ '/$'
       let l:path .= '/'
     endif
     let l:options.input = l:path
@@ -177,6 +186,9 @@ endfunction"}}}
 command! -nargs=? -complete=customlist,unite#complete_buffer UniteResume call unite#resume(<q-args>)
 
 let g:loaded_unite = 1
+
+let &cpo = s:save_cpo
+unlet s:save_cpo
 
 " __END__
 " vim: foldmethod=marker

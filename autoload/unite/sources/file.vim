@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: file.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 06 Dec 2010
+" Last Modified: 22 Apr 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -24,9 +24,12 @@
 " }}}
 "=============================================================================
 
+let s:save_cpo = &cpo
+set cpo&vim
+
 " Variables  "{{{
-call unite#util#set_default('g:unite_source_file_ignore_pattern', 
-      \'\%(^\|/\)\.$\|\~$\|\.\%(o|exe|dll|bak|sw[po]\)$')
+call unite#util#set_default('g:unite_source_file_ignore_pattern',
+      \'^\%(/\|\a\+:/\)$\|\%(^\|/\)\.\.\?$\|\~$\|\.\%(o|exe|dll|bak|sw[po]\)$')
 "}}}
 
 function! unite#sources#file#define()"{{{
@@ -36,10 +39,12 @@ endfunction"}}}
 let s:source = {
       \ 'name' : 'file',
       \ 'description' : 'candidates from file list',
-      \ 'is_volatile' : 1,
       \}
 
-function! s:source.gather_candidates(args, context)"{{{
+function! s:source.change_candidates(args, context)"{{{
+  let l:input_list = filter(split(a:context.input,
+        \                     '\\\@<! ', 1), 'v:val !~ "!"')
+  let l:input = empty(l:input_list) ? '' : l:input_list[0]
   let l:input = substitute(substitute(a:context.input, '\\ ', ' ', 'g'), '^\a\+:\zs\*/', '/', '')
 
   " Substitute *. -> .* .
@@ -52,14 +57,14 @@ function! s:source.gather_candidates(args, context)"{{{
 
   " Glob by directory name.
   let l:input = substitute(l:input, '[^/.]*$', '', '')
-  let l:candidates = split(unite#substitute_path_separator(glob(l:input . (l:input =~ '\*$' ? '' : '*'))), '\n')
+  let l:candidates = split(unite#util#substitute_path_separator(glob(l:input . (l:input =~ '\*$' ? '' : '*'))), '\n')
 
   if a:context.input != ''
-    let l:dummy = substitute(a:context.input, '[*\\]', '', 'g')
-    if (!filereadable(l:dummy) && !isdirectory(l:dummy) && isdirectory(fnamemodify(l:dummy, ':h')))
-          \ || l:dummy =~ '^\%(/\|\a\+:/\)$'
-      " Add dummy candidate.
-      call add(l:candidates, l:dummy)
+    let l:newfile = substitute(a:context.input, '[*\\]', '', 'g')
+    " if (!filereadable(l:newfile) && !isdirectory(l:newfile) && isdirectory(fnamemodify(l:newfile, ':h')))
+    if !filereadable(l:newfile) && !isdirectory(l:newfile)
+      " Add newfile candidate.
+      call add(l:candidates, l:newfile)
     endif
   endif
 
@@ -67,12 +72,24 @@ function! s:source.gather_candidates(args, context)"{{{
     call filter(l:candidates, 'v:val !~ ' . string(g:unite_source_file_ignore_pattern))
   endif
 
+  if l:input !~ '^\%(/\|\a\+:/\)$'
+    let l:parent = substitute(l:input, '[*\\]\|\.[^/]*$', '', 'g')
+
+    " if (l:input == '' || isdirectory(l:input)) && isdirectory(l:parent . '..')
+    if a:context.input =~ '\.$' && isdirectory(l:parent . '..')
+      " Add .. directory.
+      call insert(l:candidates, l:parent . '..')
+    endif
+  endif
+
   let l:candidates_dir = []
   let l:candidates_file = []
   for l:file in l:candidates
     let l:dict = {
-          \ 'word' : l:file, 'abbr' : l:file, 'source' : 'file', 'action__path' : l:file,
-          \ 'action__directory' : unite#path2directory(l:file),
+          \ 'word' : l:file,
+          \ 'abbr' : l:file, 'source' : 'file',
+          \ 'action__path' : unite#util#substitute_path_separator(fnamemodify(l:file, ':p')),
+          \ 'action__directory' : unite#util#path2directory(fnamemodify(l:file, ':p')),
           \}
 
     if isdirectory(l:file)
@@ -85,7 +102,7 @@ function! s:source.gather_candidates(args, context)"{{{
       call add(l:candidates_dir, l:dict)
     else
       if !filereadable(l:file)
-        " Dummy.
+        " New file.
         let l:dict.abbr = '[new file]' . l:file
       endif
 
@@ -97,5 +114,8 @@ function! s:source.gather_candidates(args, context)"{{{
 
   return l:candidates_dir + l:candidates_file
 endfunction"}}}
+
+let &cpo = s:save_cpo
+unlet s:save_cpo
 
 " vim: foldmethod=marker

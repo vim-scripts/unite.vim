@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: bookmark.vim
+" FILE: default.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 20 Aug 2010
+" Last Modified: 22 Apr 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -24,19 +24,23 @@
 " }}}
 "=============================================================================
 
-if exists('g:loaded_unite_source_bookmark')
-  finish
-endif
-
 let s:save_cpo = &cpo
 set cpo&vim
 
-command! -nargs=? -complete=file UniteBookmarkAdd call unite#sources#bookmark#_append(<q-args>)
+function! unite#filters#default#define()"{{{
+  " Dummy.
+  return []
+endfunction"}}}
 
-let g:loaded_unite_source_bookmark = 1
+let s:default = ['matcher_default', 'sorter_default', 'converter_default']
+function! unite#filters#default#get()"{{{
+  return s:default
+endfunction"}}}
+function! unite#filters#default#use(filters)"{{{
+  let s:default = a:filters
+endfunction"}}}
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
 
-" __END__
 " vim: foldmethod=marker
