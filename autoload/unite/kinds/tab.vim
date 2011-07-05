@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: tab.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 31 Oct 2010
+" Last Modified: 25 Jun 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -35,6 +35,7 @@ let s:kind = {
       \ 'name' : 'tab',
       \ 'default_action' : 'open',
       \ 'action_table': {},
+      \ 'alias_table': { 'edit' : 'rename' },
       \}
 
 " Actions"{{{
@@ -71,7 +72,7 @@ if exists('*gettabvar')
     for l:candidate in a:candidates
       let l:old_title = gettabvar(l:candidate.action__tab_nr, 'title')
       let l:title = input(printf('New title: %s -> ', l:old_title), l:old_title)
-      if l:title != ''
+      if l:title != '' && l:title !=# l:old_title
         call settabvar(l:candidate.action__tab_nr, 'title', l:title)
       endif
     endfor

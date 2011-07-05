@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: matcher_glob.vim
+" FILE: resume.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 26 Jun 2011.
+" Last Modified: 02 Jul 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,44 +27,37 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#filters#matcher_glob#define()"{{{
-  return s:matcher
+function! unite#sources#resume#define()"{{{
+  return s:source
 endfunction"}}}
 
-let s:matcher = {
-      \ 'name' : 'matcher_glob',
-      \ 'description' : 'glob matcher',
+let s:source = {
+      \ 'name' : 'resume',
+      \ 'description' : 'candidates from resume list',
       \}
 
-function! s:matcher.filter(candidates, context)"{{{
-  if a:context.input == ''
-    return a:candidates
-  endif
+function! s:source.gather_candidates(args, context)"{{{
+  let a:context.source__buffer_list = filter(range(1, bufnr('$')),
+        \ 'getbufvar(v:val, "&filetype") ==# "unite" && !getbufvar(v:val, "unite").context.temporary')
 
-  let l:candidates = copy(a:candidates)
+  let l:max_width = max(map(copy(a:context.source__buffer_list),
+        \ 'len(getbufvar(v:val, "unite").buffer_name)'))
+  let l:candidates = map(copy(a:context.source__buffer_list), '{
+        \ "word" : getbufvar(v:val, "unite").buffer_name,
+        \ "abbr" : printf("%-".l:max_width."s : "
+        \          . join(map(copy(getbufvar(v:val, "unite").sources), "v:val.name"), ", "),
+        \            getbufvar(v:val, "unite").buffer_name),
+        \ "kind" : "command",
+        \ "action__command" : "UniteResume " . getbufvar(v:val, "unite").buffer_name,
+        \ "source__time" : getbufvar(v:val, "unite").access_time,
+        \}')
 
-  for l:input in split(a:context.input, '\\\@<! ')
-    let l:input = substitute(l:input, '\\ ', ' ', 'g')
+  return sort(l:candidates, 's:compare')
+endfunction"}}}
 
-    if l:input =~ '^!'
-      " Exclusion.
-      let l:input = unite#escape_match(l:input)
-      let l:expr = 'v:val.word !~ ' . string(l:input[1:])
-    elseif l:input =~ '\\\@<!\*'
-      " Wildcard.
-      let l:input = unite#escape_match(l:input)
-      let l:expr = 'v:val.word =~ ' . string(l:input)
-    else
-      let l:input = substitute(l:input, '\\\(.\)', '\1', 'g')
-      let l:expr = &ignorecase ?
-            \ printf('stridx(tolower(v:val.word), %s) != -1', string(tolower(l:input))) :
-            \ printf('stridx(v:val.word, %s) != -1', string(l:input))
-    endif
-
-    call filter(l:candidates, l:expr)
-  endfor
-
-  return l:candidates
+" Misc.
+function! s:compare(candidate_a, candidate_b)"{{{
+  return a:candidate_b.source__time - a:candidate_a.source__time
 endfunction"}}}
 
 let &cpo = s:save_cpo

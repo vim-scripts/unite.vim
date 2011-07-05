@@ -1,6 +1,6 @@
 *unite.txt*	Unite all sources
 
-Version: 2.0
+Version: 2.1
 Author : Shougo <Shougo.Matsu@gmail.com>
 Documentation Author: ujihisa <ujihisa at gmail com>
 License: MIT license  {{{
@@ -247,6 +247,10 @@ COMMANDS 					*unite-commands*
 		Defines split position rule. The default value is same to
 		|g:unite_split_rule|.
 
+						*unite-options-verbose*
+		-verbose
+		Print verbose warning messages.
+
 :UniteWithCurrentDir [{options}] {sources}	*:UniteWithCurrentDir*
 		Equivalent to |:Unite| except that the initial narrowing text
 		is the current directory.
@@ -259,7 +263,7 @@ COMMANDS 					*unite-commands*
 		Equivalent to |:Unite| except that the initial narrowing text
 		is the word on the cursor.
 
-:UniteResume [{buffer-name}]name		*:UniteResume*
+:UniteResume [{buffer-name}]			*:UniteResume*
 		Reuses the unite buffer previously opened named {buffer-name}.
 		Reuses the last unite buffer you used if you skipped
 		specifying {buffer-name}.  Narrowing texts or candidates are
@@ -421,6 +425,49 @@ g:unite_source_file_rec_ignore_pattern		*g:unite_source_file_rec_ignore_pattern*
 		Refer autoload/unite/sources/file_rec.vim about the default
 		value.
 
+g:unite_source_file_rec_min_cache_files		*g:unite_source_file_rec_min_cache_files*
+		Specifies the minimum number of files that
+		|unite-source-file_rec| caches.  It doesn't cache if the
+		number of files is less than this value.
+
+		Default value is 50.
+
+g:unite_source_grep_command			*g:unite_source_grep_command*
+		Set grep command.
+
+		Default value is "grep".
+
+g:unite_source_grep_recursive_opt		*g:unite_source_grep_recursive_opt*
+		Set grep recursive option.
+
+		Default value is "-R".
+
+g:unite_source_grep_default_opts		*g:unite_source_grep_default_opts*
+		Set grep default options.
+		Note: grep output must be this pattern.
+		filename:number:pattern
+>
+		let g:unite_source_grep_default_opts = '-iRHn'
+<
+		Default value is "-Hn".
+
+g:unite_source_grep_max_candidates		*g:unite_source_grep_max_candidates*
+		Set |unite-source-grep| max candidates number.
+
+		Default value is 100.
+
+g:unite_source_line_enable_highlight		*g:unite_source_line_enable_highlight*
+		Control whether search keyword is highlighted in unite
+		buffer.
+
+		Default value is 1.
+
+g:unite_source_line_search_word_highlight	*g:unite_source_line_search_word_highlight*
+		Highlight setting applied to search keyword when
+		|g:unite_source_enable_highlight| is true.
+
+		Default value is "Search".
+
 KINDS VARIABLES					*unite-kinds-variables*
 
 g:unite_kind_jump_list_after_jump_scroll	*g:unite_kind_jump_list_after_jump_scroll*
@@ -436,6 +483,11 @@ g:unite_kind_jump_list_after_jump_scroll	*g:unite_kind_jump_list_after_jump_scro
 		100	Window bottom	normal! |z-|
 
 		Default is 25.
+
+g:unite_kind_openable_persist_open_blink_time	*g:unite_kind_openable_persist_open_blink_time*
+		A number of blink time after "persist_open" action by |unite-kind-openable|.
+
+		Default value is "250m"
 
 ------------------------------------------------------------------------------
 KEY MAPPINGS 					*unite-key-mappings*
@@ -480,9 +532,12 @@ Normal mode mappings.
 		cursor into the prompt line automatically.
 
 <Plug>(unite_toggle_mark_current_candidate)	*<Plug>(unite_toggle_mark_current_candidate)*
-		Toggles the mark of the candidate in the current line.  You may
+		Toggles the mark of the candidates in the current line.  You may
 		run an action on multiple candidates at the same time by
 		marking multiple candidates.
+
+<Plug>(unite_toggle_mark_current_candidate)	*<Plug>(unite_toggle_mark_all_candidates)*
+		Toggles the mark of the candidates in the all lines.
 
 <Plug>(unite_redraw)				*<Plug>(unite_redraw)*
 		Without waiting for the update time defined in 
@@ -519,6 +574,12 @@ Normal mode mappings.
 
 <Plug>(unite_delete_backward_path)		*<Plug>(unite_delete_backward_path)*
 		Deletes a path upward. Refer to |i_<Plug>(unite_delete_backward_path)|.
+
+<Plug>(unite_toggle_transpose_window)		*<Plug>(unite_toggle_transpose_window)*
+		Change the unite buffer's split direction.
+
+<Plug>(unite_narrowing_path)			*<Plug>(unite_narrowing_path)*
+		Narrowing candidates by candidate path(or word).
 
 Insert mode mappings.
 
@@ -577,6 +638,12 @@ Insert mode mappings.
 <Plug>(unite_input_directory)			*i_<Plug>(unite_input_directory)*
 		Same to |<Plug>(unite_input_directory)|.
 
+<Plug>(unite_toggle_selected_candidates)	*i_<Plug>(unite_toggle_transpose_window)*
+		Same to |<Plug>(unite_toggle_transpose_window)|.
+
+<Plug>(unite_narrowing_path)			*i_<Plug>(unite_narrowing_path)*
+		Same to |<Plug>(unite_narrowing_path)|.
+
 Visual mode mappings.
 
 <Plug>(unite_toggle_mark_selected_candidates)	*v_<Plug>(unite_toggle_selected_candidates)*
@@ -595,6 +662,7 @@ A		|<Plug>(unite_append_end)|
 q		|<Plug>(unite_exit)|
 <C-r>		|<Plug>(unite_restart)|
 <Space>		|<Plug>(unite_toggle_mark_current_candidate)|
+*		|<Plug>(unite_toggle_mark_all_candidates)|
 <Tab>		|<Plug>(unite_choose_action)|
 <C-n>		|<Plug>(unite_rotate_next_source)|
 <C-p>		|<Plug>(unite_rotate_previous_source)|
@@ -607,11 +675,10 @@ j		|<Plug>(unite_loop_cursor_down)|
 k		|<Plug>(unite_loop_cursor_up)|
 <Up>		|<Plug>(unite_loop_cursor_up)|
 <CR>		In case when you selected a candidate, runs default action
-l		In case when you selected a candidate, runs default action
 d		In case when you selected a candidate, runs delete action
 b		In case when you selected a candidate, runs bookmark action
 e		In case when you selected a candidate, runs narrow action
-p		In case when you selected a candidate, runs preview action
+p		runs preview action
 x		In case when you selected a candidate, runs
 		|<Plug>(unite_quick_match_default_action)|
 
@@ -633,7 +700,7 @@ Insert mode mappings.
 <C-w>		|i_<Plug>(unite_delete_backward_word)|
 <C-a>		|i_<Plug>(unite_move_head)|
 <Home>		|i_<Plug>(unite_move_head)|
-/		In case when you selected a candidate, runs narrow action
+e		In case when you selected a candidate, runs narrow action
 d		In case when you selected a candidate, runs delete action
 <Space>		In case when you selected a candidate,
 		|i_<Plug>(unite_toggle_mark_current_candidate)|
@@ -861,6 +928,9 @@ SOURCES						*unite-sources*
 
 						*unite-source-file*
 file		Nominates an input file as a candidate.
+		Note: This source doesn't nominates parent file(Example: "../")
+		or hidden files(Example: ".gitignore").  If you want to open
+		this files, please input ".".
 
 						*unite-source-file_mru*
 file_mru	Nominates files you used recently as candidates, ordering
@@ -929,6 +999,42 @@ command		Nominates Vim Ex commands as candidates.
 
 						*unite-source-mapping*
 mapping		Nominates Vim mappings as candidates.
+
+						*unite-source-grep*
+grep		Nominates "grep" command output as candidates.
+		Note: This source is created by Sixeight.
+
+		Note: This source requires vimproc.  Please install.
+		http://github.com/Shougo/vimproc/tree/master
+
+		Source arguments:
+		1. the target directory.
+		2. "grep" options.
+		3. the narrowing pattern.
+
+		Example:
+>
+	:Unite grep:~/.vim/autoload/unite/sources:-iR:file
+<
+		Special Target:
+		%         : Current buffer name
+		#         : Alternate buffer name
+		$buffers  : All buffer names
+
+						*unite-source-line*
+line		Nominates current buffer lines as candidates.
+		Note: This source is created by t9md.
+
+		Source arguments:
+		1. the search direction. "all" or "forward" or "backward".
+
+		Example:
+>
+	nnoremap <silent> /  :<C-u>Unite -buffer-name=search line -start-insert -no-quit<CR>
+<
+						*unite-source-resume*
+resume		Nominates unite buffers as candidates, ordering by time
+		series.
 
 ==============================================================================
 KINDS						*unite-kinds*
@@ -1068,6 +1174,8 @@ to define open action.
 	right		Open the file in the right, splitting vertically
 	above		Open the file in the top, splitting horizontally
 	below		Open the file in the bottom, splitting horizontally
+	persist_open	Open the file in alternate window. Don't close unite
+			window.
 
 cdable					*unite-action-cdable*
 Defines an interface for files you can move to with cd command.
@@ -1085,6 +1193,7 @@ Defines an interface for files you can move to with cd command.
 	tabvimfiler	Run |:VimFilerTab| on the directory.  This is
 			available only when you already installed |vimfiler|.
 	rec		Run |unite-source-file_rec| on the directory.
+	file		Run |unite-source-file| on the directory.
 
 file						*unite-action-file*
 Opens a file into a new buffer.  This kind extends |unite-action-openable| and
@@ -1093,6 +1202,9 @@ Opens a file into a new buffer.  This kind extends |unite-action-openable| and
 	preview		Open the file into preview window
 	bookmark	Add the file into your bookmark
 	mkdir		Make directory. If exists file, this action is invalid.
+	rename		Change the file name.
+	grep		grep files
+	grep_directory	grep directories
 
 buffer						*unite-action-buffer*
 This kind extends |unite-action-file|.
@@ -1101,6 +1213,7 @@ This kind extends |unite-action-file|.
 	wipeout		|:bwipeout| the buffer
 	unload		|:bunload| the buffer
 	bookmark	Add the candidate into your bookmark
+	rename		Change the buffer name and file name.
 
 tab						*unite-action-tab*
 This kind extends actions of |unite-action-cdable| only when |gettabvar()|
@@ -1125,6 +1238,7 @@ This kind extends actions of |unite-action-openable|.  Let me explain about
 the additional actions defined in this.
 	open		Jump to the location of the candidate
 	preview		Preview around the location of the candidate
+	replace		Replace selected candidates with |qfreplace| plugin
 
 command						*unite-action-command*
 	execute		Execute the command
@@ -1233,6 +1347,9 @@ EXAMPLES					*unite-examples*
 	nnoremap <silent> [unite]o  :<C-u>Unite outline<CR>
 	nnoremap  [unite]f  :<C-u>Unite source<CR>
 	
+	" Start insert.
+	"let g:unite_enable_start_insert = 1
+	
 	autocmd FileType unite call s:unite_my_settings()
 	function! s:unite_my_settings()"{{{
 	  " Overwrite settings.
@@ -1243,9 +1360,6 @@ EXAMPLES					*unite-examples*
 	
 	  " <C-l>: manual neocomplcache completion.
 	  inoremap <buffer> <C-l>  <C-x><C-u><C-p><Down>
-	
-	  " Start insert.
-	  "let g:unite_enable_start_insert = 1
 	endfunction"}}}
 	
 	let g:unite_source_file_mru_limit = 200
@@ -1270,6 +1384,138 @@ BUGS						*unite-bugs*
 
 ==============================================================================
 CHANGELOG					*unite-changelog*
+
+------------------------------------------------------------------------------
+ChangeLog unite.vim Ver.2.1:
+
+2011-07-05
+- Released unite.vim Ver.2.1.
+
+2011-07-03
+- Improved insert enter mappings.
+- Renamed lines source to line.
+
+2011-07-02
+- Added matcher_regexp filter.
+- Changed lines and grep filters.
+- Added resume source.
+
+2011-06-30
+- Added direction argument in source lines.
+- Improved file_rec source.
+- Added g:unite_source_file_rec_min_cache_files option.
+
+2011-06-28
+- Added <Plug>(unite_toggle_selected_candidates) keymapping.
+- Improved unite buffer initialize.
+- Added <Plug>(unite_narrowing_path) keymapping.
+- Supported redraw in source lines.
+- Improved unite buffer initialize.
+
+2011-06-26
+- Improved autocmd.
+- Improved matcher.
+- Improved error highlight.
+- Improved preview action in jump_list.
+- Added lines source.
+- Fixed for syntax case.
+- Added persist_open action.
+
+2011-06-25
+- Added rename action.
+- Deleted search pattern.
+- Fixed initialize unite bug.
+- Added grep source(Thanks Sixeight).
+- Improved unite-grep.
+- Added pattern highlight in unite-grep.
+
+2011-06-24
+- Don't follow symbolic link in file_rec source.
+
+2011-06-20
+- Improved unite -immediately behavior.
+- Fixed path separator problem in unite-file.
+
+2011-06-19
+- Improved detect error in mru.
+
+2011-06-18
+- Fixed hlsearch.
+
+2011-06-17
+- Fixed caching bug.
+- Improved s:recache_candidates().
+
+2011-06-15
+- Fixed unite-buffer-name problem.
+
+2011-06-13
+- Fixed switch_unite_buffer().
+
+2011-06-12
+- Fixed quit unite buffer problem.
+
+2011-06-11
+- Improved kind tab.
+
+2011-06-10
+- Added -verbose option.
+
+2011-06-09
+- Improved unite#print_error().
+
+2011-06-07
+- Improved "e" mapping.
+- Changed insert mode mappings.
+
+2011-06-04
+- Added <Plug>(unite_toggle_mark_all_candidates) keymapping.
+- Deleted l default keymapping.
+
+2011-06-03
+- Fixed unite-register freeze.
+- Fixed initialize error.
+- Added file action in cdable kind.
+- Improved narrow action.
+
+2011-06-02
+- Added replace action in jump_list kind.
+- Improved redraw.
+
+2011-06-01
+- Fixed recaching.
+- Fixed choose_action.
+
+2011-05-31
+- Improved redraw flag.
+- Fixed is_redraw flag.
+
+2011-05-21
+- Improved file_mru.
+
+2011-05-16
+- Fixed directory_mru error.
+
+2011-05-15
+- Improved alias in choose action.
+
+2011-05-14
+- Fixed kind command.
+- Fixed preview action.
+- Updated vital.vim.
+- Fixed choose_action().
+
+2011-05-08
+- Fixed :UniteResume error.
+- Improved cursor move behavior.
+- Ver.2.1 development is started.
+
+2011-05-06
+- Fixed syntax error.
+- Fixed example.
+- Improved g:unite_enable_start_insert option.
+- Added .gitignore file.
+- Improved file source discription.
 
 2011-05-01
 - Ver.2.0 is released.

@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: matcher_glob.vim
+" FILE: matcher_regexp.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 26 Jun 2011.
+" Last Modified: 02 Jul 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,13 +27,13 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#filters#matcher_glob#define()"{{{
+function! unite#filters#matcher_regexp#define()"{{{
   return s:matcher
 endfunction"}}}
 
 let s:matcher = {
-      \ 'name' : 'matcher_glob',
-      \ 'description' : 'glob matcher',
+      \ 'name' : 'matcher_regexp',
+      \ 'description' : 'regular expression matcher',
       \}
 
 function! s:matcher.filter(candidates, context)"{{{
@@ -42,26 +42,21 @@ function! s:matcher.filter(candidates, context)"{{{
   endif
 
   let l:candidates = copy(a:candidates)
-
   for l:input in split(a:context.input, '\\\@<! ')
-    let l:input = substitute(l:input, '\\ ', ' ', 'g')
-
-    if l:input =~ '^!'
-      " Exclusion.
-      let l:input = unite#escape_match(l:input)
-      let l:expr = 'v:val.word !~ ' . string(l:input[1:])
-    elseif l:input =~ '\\\@<!\*'
-      " Wildcard.
-      let l:input = unite#escape_match(l:input)
-      let l:expr = 'v:val.word =~ ' . string(l:input)
-    else
+    if l:input !~ '[~\\.^$[\]*]'
+      " Optimized filter.
       let l:input = substitute(l:input, '\\\(.\)', '\1', 'g')
       let l:expr = &ignorecase ?
             \ printf('stridx(tolower(v:val.word), %s) != -1', string(tolower(l:input))) :
             \ printf('stridx(v:val.word, %s) != -1', string(l:input))
-    endif
 
-    call filter(l:candidates, l:expr)
+      call filter(l:candidates, l:expr)
+    else
+      try
+        call filter(l:candidates, 'v:val.word =~ ' . string(l:input))
+      catch
+      endtry
+    endif
   endfor
 
   return l:candidates

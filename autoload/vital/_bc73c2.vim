@@ -45,17 +45,11 @@ function! s:_import(name, scripts)
   let target = a:name == '' ? '' : '/' . substitute(a:name, '\W\+', '/', 'g')
   let target = substitute(target, '\l\zs\ze\u', '_', 'g') " OrderedSet -> Ordered_Set
   let target = substitute(target, '[/_]\zs\u', '\l\0', 'g') " Ordered_Set -> ordered_set
-  let pat = substitute(s:base_dir . target, '[/\\]', '[/\\\\]', 'g') . '\.vim$'
-  let sid = 0
-  for script in a:scripts
-    if script =~? pat
-      let sid = matchstr(script, '^\s*\zs\d\+') - 0
-      break
-    endif
-  endfor
+  let target = s:base_dir . target . '.vim'
+  let sid = get(a:scripts, s:_unify_path(target), 0)
   if !sid
     try
-      source `=s:base_dir . target . '.vim'`
+      source `=target`
     catch /^Vim\%((\a\+)\)\?:E484/
       throw 'vital: module not found: ' . a:name
     endtry
@@ -65,10 +59,18 @@ function! s:_import(name, scripts)
 endfunction
 
 function! s:_scripts()
-  redir => scripts
-    silent! scriptnames
-  redir END
-  return split(scripts, "\n")
+  let scripts = {}
+  for line in split(s:_redir('scriptnames'), "\n")
+    let list = matchlist(line, '^\s*\(\d\+\):\s\+\(.\+\)\s*$')
+    if !empty(list)
+      let scripts[s:_unify_path(list[2])] = list[1] - 0
+    endif
+  endfor
+  return scripts
+endfunction
+
+function! s:_unify_path(path)
+  return fnamemodify(resolve(a:path), ':p:gs?\\\+?/?')
 endfunction
 
 function! s:_build_module(sid)
@@ -76,10 +78,8 @@ function! s:_build_module(sid)
     return copy(s:loaded[a:sid])
   endif
   let prefix = '<SNR>' . a:sid . '_'
-  redir => funcs
-    silent! function
-  redir END
-  let filter_pat = '^function ' . prefix
+  let funcs = s:_redir('function')
+  let filter_pat = '^\s*function ' . prefix
   let map_pat = prefix . '\zs\w\+'
   let functions = map(filter(split(funcs, "\n"), 'v:val =~# filter_pat'),
   \          'matchstr(v:val, map_pat)')
@@ -98,6 +98,13 @@ function! s:_build_module(sid)
   call filter(module, 'v:key =~# "^\\a"')
   let s:loaded[a:sid] = module
   return copy(module)
+endfunction
+
+function! s:_redir(cmd)
+  redir => res
+    silent! execute a:cmd
+  redir END
+  return res
 endfunction
 
 function! vital#{s:self_version}#new()
