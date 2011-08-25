@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: output.vim
+" FILE: file_point.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 11 Jul 2011.
+" Last Modified: 10 Aug 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,33 +27,44 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-" Variables  "{{{
-"}}}
-
-function! unite#sources#output#define()"{{{
+function! unite#sources#file_point#define()"{{{
   return s:source
 endfunction"}}}
 
 let s:source = {
-      \ 'name' : 'output',
-      \ 'description' : 'candidates from Vim command output',
-      \ 'default_action' : 'yank',
-      \ }
+      \ 'name' : 'file_point',
+      \ 'description' : 'file candidate from cursor point',
+      \ 'hooks' : {},
+      \}
+function! s:source.hooks.on_init(args, context)"{{{
+  let l:filename_pattern = '[[:alnum:];/?:@&=+$,_.!~*''|()-]\+'
+  let l:filename = expand(matchstr(getline('.')[: col('.')-1], l:filename_pattern . '$')
+        \ . matchstr(getline('.')[col('.') :], '^'.l:filename_pattern))
+  let a:context.source__filename =
+        \ (l:filename =~ '^\%(https\?\|ftp\)://') ?
+        \ l:filename : fnamemodify(l:filename, ':p')
+endfunction"}}}
 
 function! s:source.gather_candidates(args, context)"{{{
-  let l:command = get(a:args, 0)
-  if l:command == ''
-    let l:command = input('Please input Vim command: ', '', 'command')
+  if a:context.source__filename =~ '^\%(https\?\|ftp\)://'
+    " URI.
+    return [{
+          \   'word' : a:context.source__filename,
+          \   'kind' : 'uri',
+          \   'action__path' : a:context.source__filename,
+          \ }]
+  elseif filereadable(a:context.source__filename)
+    return [{
+          \   'word' : a:context.source__filename,
+          \   'kind' : 'file',
+          \   'action__path' : a:context.source__filename,
+          \   'action__directory' : unite#util#path2directory(
+          \               a:context.source__filename),
+          \ }]
+  else
+    " File not found.
+    return []
   endif
-
-  redir => l:result
-  silent execute l:command
-  redir END
-
-  return map(split(l:result, '\r\n\|\n'), '{
-        \ "word" : v:val,
-        \ "kind" : "word",
-        \ }')
 endfunction"}}}
 
 let &cpo = s:save_cpo

@@ -2,7 +2,7 @@
 " FILE: grep.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu at gmail.com>
 "          Tomohiro Nishimura <tomohiro68 at gmail.com>
-" Last Modified: 03 Jul 2011.
+" Last Modified: 10 Aug 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -73,8 +73,8 @@ let s:grep_source = {
       \ 'max_candidates': g:unite_source_grep_max_candidates,
       \ 'hooks' : {},
       \ 'syntax' : 'uniteSource__Grep',
+      \ 'filters' : ['matcher_regexp', 'sorter_default', 'converter_default'],
       \ }
-call unite#custom_filters('grep', ['matcher_regexp', 'sorter_default', 'converter_default'])
 
 function! s:grep_source.hooks.on_init(args, context) "{{{
   let l:target  = get(a:args, 0, '')
@@ -115,6 +115,11 @@ function! s:grep_source.hooks.on_syntax(args, context)"{{{
         \ . '/ contained containedin=uniteSource__Grep'
   highlight default link uniteSource__GrepPattern Search
 endfunction"}}}
+function! s:grep_source.hooks.on_close(args, context) "{{{
+  if has_key(a:context, 'source__proc')
+    call a:context.source__proc.waitpid()
+  endif
+endfunction "}}}
 
 function! s:grep_source.gather_candidates(args, context) "{{{
   if empty(a:context.source__target)
@@ -125,6 +130,8 @@ function! s:grep_source.gather_candidates(args, context) "{{{
   endif
 
   if a:context.is_redraw
+    call unite#print_message('[grep] Target: ' . join(a:context.source__target))
+    call unite#print_message('[grep] Pattern: ' . a:context.source__input)
     let a:context.is_async = 1
   endif
 
@@ -153,45 +160,20 @@ function! s:grep_source.async_gather_candidates(args, context) "{{{
     let a:context.is_async = 0
   endif
 
-  let l:result = []
-  if has('reltime') && has('float')
-    let l:time = reltime()
-    while str2float(reltimestr(reltime(l:time))) < 0.2
-          \       && !l:stdout.eof
-      let l:output = l:stdout.read_line()
-      if l:output != ''
-        call add(l:result, l:output)
-      endif
-    endwhile
-  else
-    let i = 100
-    while 0 < i && !l:stdout.eof
-      let l:output = l:stdout.read_line()
-      if l:output != ''
-        call add(l:result, l:output)
-      endif
-
-      let i -= 1
-    endwhile
-  endif
-
-  let l:candidates = map(filter(l:result,
+  let l:candidates = map(filter(map(l:stdout.read_lines(-1, 300),
+        \ 'iconv(v:val, &termencoding, &encoding)'),
     \  'v:val =~ "^.\\+:.\\+:.\\+$"'),
     \ '[v:val, split(v:val[2:], ":")]')
 
   return map(l:candidates,
     \ '{
     \   "word": v:val[0],
-    \   "source": "grep",
     \   "kind": "jump_list",
-    \   "action__path": v:val[0][:1].v:val[1][0],
+    \   "action__path": unite#util#substitute_path_separator(
+    \                   fnamemodify(v:val[0][:1].v:val[1][0], ":p")),
     \   "action__line": v:val[1][1],
     \   "action__text": join(v:val[1][2:], ":"),
     \ }')
-endfunction "}}}
-
-function! s:grep_source.on_close(args, context) "{{{
-  call a:context.source__proc.close()
 endfunction "}}}
 
 " vim: foldmethod=marker

@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: output.vim
+" FILE: source.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 11 Jul 2011.
+" Last Modified: 03 Aug 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,34 +27,33 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-" Variables  "{{{
-"}}}
-
-function! unite#sources#output#define()"{{{
-  return s:source
+function! unite#kinds#source#define()"{{{
+  return s:kind
 endfunction"}}}
 
-let s:source = {
-      \ 'name' : 'output',
-      \ 'description' : 'candidates from Vim command output',
-      \ 'default_action' : 'yank',
+let s:kind = {
+      \ 'name' : 'source',
+      \ 'default_action' : 'start',
+      \ 'action_table': {},
+      \}
+
+" Actions"{{{
+let s:kind.action_table.start = {
+      \ 'description' : 'start source',
+      \ 'is_selectable' : 1,
       \ }
+function! s:kind.action_table.start.func(candidates)"{{{
+  let l:context = unite#get_context()
+  let l:context.input = ''
+  let l:context.auto_preview = 0
+  let l:context.default_action = 'default'
 
-function! s:source.gather_candidates(args, context)"{{{
-  let l:command = get(a:args, 0)
-  if l:command == ''
-    let l:command = input('Please input Vim command: ', '', 'command')
-  endif
-
-  redir => l:result
-  silent execute l:command
-  redir END
-
-  return map(split(l:result, '\r\n\|\n'), '{
-        \ "word" : v:val,
-        \ "kind" : "word",
-        \ }')
+  call unite#start(map(copy(a:candidates),
+        \ 'has_key(v:val, "action__source_args") ?'
+        \  . 'insert(v:val.action__source_args, v:val.action__source_name) :'
+        \  . 'v:val.action__source_name'), l:context)
 endfunction"}}}
+"}}}
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: output.vim
+" FILE: changes.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 11 Jul 2011.
+" Last Modified: 23 Jul 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -30,30 +30,48 @@ set cpo&vim
 " Variables  "{{{
 "}}}
 
-function! unite#sources#output#define()"{{{
+function! unite#sources#change#define()"{{{
   return s:source
 endfunction"}}}
 
 let s:source = {
-      \ 'name' : 'output',
-      \ 'description' : 'candidates from Vim command output',
-      \ 'default_action' : 'yank',
+      \ 'name' : 'change',
+      \ 'description' : 'candidates from changes',
+      \ 'hooks' : {},
       \ }
 
-function! s:source.gather_candidates(args, context)"{{{
-  let l:command = get(a:args, 0)
-  if l:command == ''
-    let l:command = input('Please input Vim command: ', '', 'command')
-  endif
-
-  redir => l:result
-  silent execute l:command
+let s:cached_result = []
+function! s:source.hooks.on_init(args, context)"{{{
+  " Get changes list.
+  redir => l:redir
+  silent! changes
   redir END
 
-  return map(split(l:result, '\r\n\|\n'), '{
-        \ "word" : v:val,
-        \ "kind" : "word",
-        \ }')
+  let l:result = []
+  let l:max_width = (winwidth(0) - 5)
+  for change in split(l:redir, '\n')[1:]
+    let l:list = split(change)
+    if len(l:list) < 4
+      continue
+    endif
+
+    let [l:linenr, l:col, l:text] = [l:list[1], l:list[2]+1, join(l:list[3:])]
+
+    call add(l:result, {
+          \ 'word' : unite#util#truncate_smart(printf('%4d-%-3d  %s', l:linenr, l:col, l:text),
+          \           l:max_width, l:max_width/3, '..'),
+          \ 'kind' : 'jump_list',
+          \ 'action__path' : unite#util#substitute_path_separator(fnamemodify(expand('%'), ':p')),
+          \ 'action__buffer_nr' : bufnr('%'),
+          \ 'action__line' : l:linenr,
+          \ 'action__col' : l:col,
+          \ })
+  endfor
+
+  let a:context.source__result = l:result
+endfunction"}}}
+function! s:source.gather_candidates(args, context)"{{{
+  return a:context.source__result
 endfunction"}}}
 
 let &cpo = s:save_cpo

@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: output.vim
+" FILE: uri.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 11 Jul 2011.
+" Last Modified: 10 Aug 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,34 +27,29 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-" Variables  "{{{
-"}}}
-
-function! unite#sources#output#define()"{{{
-  return s:source
+function! unite#kinds#uri#define()"{{{
+  return s:kind
 endfunction"}}}
 
-let s:source = {
-      \ 'name' : 'output',
-      \ 'description' : 'candidates from Vim command output',
-      \ 'default_action' : 'yank',
+let s:System = vital#of('unite').import('System.File')
+
+let s:kind = {
+      \ 'name' : 'uri',
+      \ 'default_action' : 'start',
+      \ 'action_table' : {},
+      \}
+
+" Actions"{{{
+let s:kind.action_table.start = {
+      \ 'description' : 'open files with associated program',
+      \ 'is_selectable' : 1,
       \ }
-
-function! s:source.gather_candidates(args, context)"{{{
-  let l:command = get(a:args, 0)
-  if l:command == ''
-    let l:command = input('Please input Vim command: ', '', 'command')
-  endif
-
-  redir => l:result
-  silent execute l:command
-  redir END
-
-  return map(split(l:result, '\r\n\|\n'), '{
-        \ "word" : v:val,
-        \ "kind" : "word",
-        \ }')
+function! s:kind.action_table.start.func(candidates)"{{{
+  for l:candidate in a:candidates
+    call s:System.open(l:candidate.action__path)
+  endfor
 endfunction"}}}
+"}}}
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

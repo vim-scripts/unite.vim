@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: output.vim
+" FILE: converter_relative_word.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 11 Jul 2011.
+" Last Modified: 02 Aug 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,33 +27,39 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-" Variables  "{{{
-"}}}
-
-function! unite#sources#output#define()"{{{
-  return s:source
+function! unite#filters#converter_relative_word#define()"{{{
+  return s:converter
 endfunction"}}}
 
-let s:source = {
-      \ 'name' : 'output',
-      \ 'description' : 'candidates from Vim command output',
-      \ 'default_action' : 'yank',
-      \ }
+let s:converter = {
+      \ 'name' : 'converter_relative_word',
+      \ 'description' : 'relative path word converter',
+      \}
 
-function! s:source.gather_candidates(args, context)"{{{
-  let l:command = get(a:args, 0)
-  if l:command == ''
-    let l:command = input('Please input Vim command: ', '', 'command')
-  endif
+function! s:converter.filter(candidates, context)"{{{
+  try
+    let l:directory = unite#util#substitute_path_separator(getcwd())
+    if has_key(a:context, 'source__directory')
+      let l:old_dir = l:directory
+      let l:directory = substitute(a:context.source__directory, '*', '', 'g')
 
-  redir => l:result
-  silent execute l:command
-  redir END
+      if l:directory !=# l:old_dir
+        lcd `=l:directory`
+      endif
+    endif
 
-  return map(split(l:result, '\r\n\|\n'), '{
-        \ "word" : v:val,
-        \ "kind" : "word",
-        \ }')
+    for candidate in a:candidates
+      let candidate.word = unite#util#substitute_path_separator(
+            \ fnamemodify(candidate.word, ':.'))
+    endfor
+  finally
+    if has_key(a:context, 'source__directory')
+          \ && l:directory !=# l:old_dir
+      lcd `=l:old_dir`
+    endif
+  endtry
+
+  return a:candidates
 endfunction"}}}
 
 let &cpo = s:save_cpo
