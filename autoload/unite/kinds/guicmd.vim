@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: tab.vim
+" FILE: guicmd.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 19 Sep 2011.
+" Last Modified: 26 Sep 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,63 +27,66 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#kinds#tab#define()"{{{
+function! unite#kinds#guicmd#define()"{{{
   return s:kind
 endfunction"}}}
 
 let s:kind = {
-      \ 'name' : 'tab',
-      \ 'default_action' : 'open',
+      \ 'name' : 'guicmd',
+      \ 'default_action' : 'execute',
       \ 'action_table': {},
-      \ 'alias_table': { 'edit' : 'rename' },
+      \ 'alias_table' : { 'ex' : 'nop' },
       \}
 
 " Actions"{{{
-let s:kind.action_table.open = {
-      \ 'description' : 'open this tab',
+let s:kind.action_table.execute = {
+      \ 'description' : 'execute command',
       \ }
-function! s:kind.action_table.open.func(candidate)"{{{
-  execute 'tabnext' a:candidate.action__tab_nr
-endfunction"}}}
+function! s:kind.action_table.execute.func(candidate)"{{{
+  let args = [a:candidate.action__path]
+  if has_key(a:candidate, 'action__args')
+    let args += a:candidate.action__args
+  endif
 
-let s:kind.action_table.delete = {
-      \ 'description' : 'delete tabs',
-      \ 'is_selectable' : 1,
-      \ 'is_invalidate_cache' : 1,
-      \ 'is_quit' : 0,
+  if unite#util#is_win()
+    let args[0] = resolve(args[0])
+  endif
+
+  let cmdline = unite#util#is_win() ?
+        \ join(map(args, '"\"".v:val."\""')) :
+        \ args[0] . ' ' . join(map(args[1:], "''''.v:val.''''"))
+
+  if unite#util#is_win()
+    silent execute ':!start' cmdline
+  else
+    call system(cmdline . ' &')
+  endif
+endfunction"}}}
+let s:kind.action_table.edit = {
+      \ 'description' : 'edit command args',
       \ }
-function! s:kind.action_table.delete.func(candidates)"{{{
-  for candidate in sort(a:candidates, 's:compare')
-    execute 'tabclose' candidate.action__tab_nr
-  endfor
+function! s:kind.action_table.edit.func(candidate)"{{{
+  let args = [a:candidate.action__path]
+  if has_key(a:candidate, 'action__args')
+    let args += a:candidate.action__args
+  endif
+
+  if unite#util#is_win()
+    let args[0] = resolve(args[0])
+  endif
+
+  let cmdline = unite#util#is_win() ?
+        \ join(map(args, '"\"".v:val."\""')) :
+        \ args[0] . ' ' . join(map(args[1:], "''''.v:val.''''"))
+  let cmdline = input('Edit command args :', cmdline, 'file')
+
+  if unite#util#is_win()
+    silent execute ':!start' cmdline
+  else
+    call system(cmdline . ' &')
+  endif
 endfunction"}}}
-
-if exists('*gettabvar')
-  " Enable cd action.
-  let s:kind.parents = ['cdable']
-
-  let s:kind.action_table.rename = {
-      \ 'description' : 'rename tabs',
-      \ 'is_selectable' : 1,
-      \ 'is_invalidate_cache' : 1,
-      \ 'is_quit' : 0,
-        \ }
-  function! s:kind.action_table.rename.func(candidates)"{{{
-    for candidate in a:candidates
-      let old_title = gettabvar(candidate.action__tab_nr, 'title')
-      let title = input(printf('New title: %s -> ', old_title), old_title)
-      if title != '' && title !=# old_title
-        call settabvar(candidate.action__tab_nr, 'title', title)
-      endif
-    endfor
-  endfunction"}}}
-endif
 "}}}
-
-" Misc
-function! s:compare(candidate_a, candidate_b)"{{{
-  return a:candidate_b.action__tab_nr - a:candidate_a.action__tab_nr
-endfunction"}}}
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

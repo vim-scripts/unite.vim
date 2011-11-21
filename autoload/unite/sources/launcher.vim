@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: resume.vim
+" FILE: launcher.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 17 Oct 2011.
+" Last Modified: 19 Sep 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,39 +27,47 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#sources#resume#define()"{{{
+" Variables  "{{{
+"}}}
+
+function! unite#sources#launcher#define()"{{{
   return s:source
 endfunction"}}}
 
 let s:source = {
-      \ 'name' : 'resume',
-      \ 'description' : 'candidates from resume list',
-      \}
+      \ 'name' : 'launcher',
+      \ 'description' : 'candidates from executable files',
+      \ }
 
+let s:cached_result = {}
 function! s:source.gather_candidates(args, context)"{{{
-  let a:context.source__buffer_list = filter(range(1, bufnr('$')),
-        \ 'getbufvar(v:val, "&filetype") ==# "unite"
-        \  && !getbufvar(v:val, "unite").context.temporary
-        \  && getbufvar(v:val, "unite").sources[0].name != "resume"')
+  let path = get(a:args, 0, '')
+  if path == ''
+    " Use $PATH.
+    let path = substitute($PATH, (unite#util#is_win() ? ';' : ':'), ',', 'g')
+  endif
 
-  let max_width = max(map(copy(a:context.source__buffer_list),
-        \ 'len(getbufvar(v:val, "unite").buffer_name)'))
-  let candidates = map(copy(a:context.source__buffer_list), '{
-        \ "word" : getbufvar(v:val, "unite").buffer_name,
-        \ "abbr" : printf("%-".max_width."s : "
-        \          . join(map(copy(getbufvar(v:val, "unite").sources), "v:val.name"), ", "),
-        \            getbufvar(v:val, "unite").buffer_name),
-        \ "kind" : "command",
-        \ "action__command" : "UniteResume " . getbufvar(v:val, "unite").buffer_name,
-        \ "source__time" : getbufvar(v:val, "unite").access_time,
-        \}')
+  if !has_key(s:cached_result, path) || a:context.is_redraw
+    " Search executable files from $PATH.
+    let files = split(globpath(path, '*'), '\n')
 
-  return sort(candidates, 's:compare')
-endfunction"}}}
+    if unite#util#is_win()
+      let exts = escape(substitute($PATHEXT . ';.LNK', ';', '\\|', 'g'), '.')
+      let pattern = '"." . fnamemodify(v:val, ":e") =~? '.string(exts)
+    else
+      let pattern = 'executable(v:val)'
+    endif
 
-" Misc.
-function! s:compare(candidate_a, candidate_b)"{{{
-  return a:candidate_b.source__time - a:candidate_a.source__time
+    call filter(files, pattern)
+
+    let s:cached_result[path] = map(files, '{
+          \ "word" : v:val,
+          \ "kind" : "guicmd",
+          \ "action__path" : v:val,
+          \ }')
+  endif
+
+  return s:cached_result[path]
 endfunction"}}}
 
 let &cpo = s:save_cpo

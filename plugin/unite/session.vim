@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: resume.vim
+" FILE: session.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 17 Oct 2011.
+" Last Modified: 05 Oct 2010
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -24,45 +24,34 @@
 " }}}
 "=============================================================================
 
+if exists('g:loaded_unite_source_session')
+  finish
+endif
+
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#sources#resume#define()"{{{
-  return s:source
-endfunction"}}}
+let g:unite_source_session_enable_auto_save =
+      \ get(g:, 'unite_source_session_enable_auto_save', 0)
 
-let s:source = {
-      \ 'name' : 'resume',
-      \ 'description' : 'candidates from resume list',
-      \}
+command! -nargs=? -complete=customlist,unite#sources#session#_complete
+      \ UniteSessionSave call unite#sources#session#_save(<q-args>)
 
-function! s:source.gather_candidates(args, context)"{{{
-  let a:context.source__buffer_list = filter(range(1, bufnr('$')),
-        \ 'getbufvar(v:val, "&filetype") ==# "unite"
-        \  && !getbufvar(v:val, "unite").context.temporary
-        \  && getbufvar(v:val, "unite").sources[0].name != "resume"')
+command! -nargs=? -complete=customlist,unite#sources#session#_complete
+      \ UniteSessionLoad call unite#sources#session#_load(<q-args>)
 
-  let max_width = max(map(copy(a:context.source__buffer_list),
-        \ 'len(getbufvar(v:val, "unite").buffer_name)'))
-  let candidates = map(copy(a:context.source__buffer_list), '{
-        \ "word" : getbufvar(v:val, "unite").buffer_name,
-        \ "abbr" : printf("%-".max_width."s : "
-        \          . join(map(copy(getbufvar(v:val, "unite").sources), "v:val.name"), ", "),
-        \            getbufvar(v:val, "unite").buffer_name),
-        \ "kind" : "command",
-        \ "action__command" : "UniteResume " . getbufvar(v:val, "unite").buffer_name,
-        \ "source__time" : getbufvar(v:val, "unite").access_time,
-        \}')
+if g:unite_source_session_enable_auto_save
+  augroup plugin-unite-source-session
+    autocmd!
+    autocmd CursorHold *
+          \ if v:this_session != '' | call unite#sources#session#_save('') | endif
+  augroup END
+endif
 
-  return sort(candidates, 's:compare')
-endfunction"}}}
-
-" Misc.
-function! s:compare(candidate_a, candidate_b)"{{{
-  return a:candidate_b.source__time - a:candidate_a.source__time
-endfunction"}}}
+let g:loaded_unite_source_session = 1
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
 
+" __END__
 " vim: foldmethod=marker

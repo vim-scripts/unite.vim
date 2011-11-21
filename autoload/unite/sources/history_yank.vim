@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: resume.vim
+" FILE: history_yank.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 17 Oct 2011.
+" Last Modified: 20 Nov 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,40 +27,59 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#sources#resume#define()"{{{
+" Variables  "{{{
+let s:yank_histories = []
+
+call unite#util#set_default('g:unite_source_history_yank_limit', 100)
+"}}}
+
+function! unite#sources#history_yank#define()"{{{
   return s:source
+endfunction"}}}
+function! unite#sources#history_yank#_append()"{{{
+  if empty(s:yank_histories) ||
+        \ s:yank_histories[0] != @"
+    " Append @" value.
+    call insert(s:yank_histories, @")
+
+    if g:unite_source_history_yank_limit > len(s:yank_histories)
+      let s:yank_histories =
+            \ s:yank_histories[ : g:unite_source_history_yank_limit - 1]
+    endif
+  endif
 endfunction"}}}
 
 let s:source = {
-      \ 'name' : 'resume',
-      \ 'description' : 'candidates from resume list',
+      \ 'name' : 'history/yank',
+      \ 'description' : 'candidates from yank history',
+      \ 'action_table' : {},
       \}
 
 function! s:source.gather_candidates(args, context)"{{{
-  let a:context.source__buffer_list = filter(range(1, bufnr('$')),
-        \ 'getbufvar(v:val, "&filetype") ==# "unite"
-        \  && !getbufvar(v:val, "unite").context.temporary
-        \  && getbufvar(v:val, "unite").sources[0].name != "resume"')
-
-  let max_width = max(map(copy(a:context.source__buffer_list),
-        \ 'len(getbufvar(v:val, "unite").buffer_name)'))
-  let candidates = map(copy(a:context.source__buffer_list), '{
-        \ "word" : getbufvar(v:val, "unite").buffer_name,
-        \ "abbr" : printf("%-".max_width."s : "
-        \          . join(map(copy(getbufvar(v:val, "unite").sources), "v:val.name"), ", "),
-        \            getbufvar(v:val, "unite").buffer_name),
-        \ "kind" : "command",
-        \ "action__command" : "UniteResume " . getbufvar(v:val, "unite").buffer_name,
-        \ "source__time" : getbufvar(v:val, "unite").access_time,
-        \}')
-
-  return sort(candidates, 's:compare')
+  let max_width = winwidth(0) - 5
+  let histories = map(copy(s:yank_histories), 'v:val[: max_width*2]')
+  return map(histories, "{
+        \ 'word' : v:val[: max_width],
+        \ 'abbr' : substitute(unite#util#truncate(v:val, max_width),
+        \         '\\t', '>---', 'g'),
+        \ 'kind' : 'word',
+        \ 'is_multiline' : 1,
+        \ }")
 endfunction"}}}
 
-" Misc.
-function! s:compare(candidate_a, candidate_b)"{{{
-  return a:candidate_b.source__time - a:candidate_a.source__time
+" Actions"{{{
+let s:source.action_table.delete = {
+      \ 'description' : 'delete from yank history',
+      \ 'is_invalidate_cache' : 1,
+      \ 'is_quit' : 0,
+      \ 'is_selectable' : 1,
+      \ }
+function! s:source.action_table.delete.func(candidates)"{{{
+  for candidate in a:candidates
+    call filter(s:yank_histories, 'v:val !=# candidate.word')
+  endfor
 endfunction"}}}
+"}}}
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

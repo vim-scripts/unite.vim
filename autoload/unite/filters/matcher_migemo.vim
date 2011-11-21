@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: matcher_regexp.vim
+" FILE: matcher_migemo.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 19 Sep 2011.
+" Last Modified: 24 Oct 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,13 +27,56 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#filters#matcher_regexp#define()"{{{
+function! unite#filters#matcher_migemo#define()"{{{
+  if !has('migemo') && !executable('cmigemo')
+    " Not supported.
+    return {}
+  endif
+
+  let s:migemodict = s:search_dict()
+  if has('migemo') && (&migemodict == '' || !filereadable(&migemodict))
+    let &migemodict = s:migemodict
+  endif
+  if s:migemodict == ''
+    " Dictionary not found.
+    return {}
+  endif
+
   return s:matcher
 endfunction"}}}
 
+function! s:search_dict()
+  let dict = s:search_dict2('migemo/'.&encoding.'/migemo-dict')
+
+  if dict == ''
+    let dict = s:search_dict2(&encoding.'/migemo-dict')
+  endif
+  if dict == ''
+    let dict = s:search_dict2('migemo-dict')
+  endif
+
+  return dict
+endfunction
+
+function! s:search_dict2(name)
+  let path = $VIM . ',' . &runtimepath
+  let dict = globpath(path, 'dict/'.a:name)
+  if dict == ''
+    let dict = globpath(path, a:name)
+  endif
+  if dict == ''
+    let dict = '/usr/local/share/migemo/'.a:name
+    if !filereadable(dict)
+      return ''
+    endif
+  endif
+
+  return split(dict, '\n')[0]
+endfunction
+
 let s:matcher = {
-      \ 'name' : 'matcher_regexp',
-      \ 'description' : 'regular expression matcher',
+      \ 'name' : 'matcher_migemo',
+      \ 'description' : 'migemo matcher',
       \}
 
 function! s:matcher.filter(candidates, context)"{{{
@@ -50,21 +93,13 @@ function! s:matcher.filter(candidates, context)"{{{
       " Exclusion match.
       try
         let candidates = filter(copy(candidates),
-              \ 'v:val.word !~ ' . string(input[1:]))
+              \ 'v:val.word !~ ' . string(s:get_migemo_pattern(input[1:])))
       catch
       endtry
-    elseif input !~ '[~\\.^$[\]*]'
-      " Optimized filter.
-      let input = substitute(input, '\\\(.\)', '\1', 'g')
-      let expr = &ignorecase ?
-            \ printf('stridx(tolower(v:val.word), %s) != -1', string(tolower(input))) :
-            \ printf('stridx(v:val.word, %s) != -1', string(input))
-
-      let candidates = filter(copy(candidates), expr)
     else
       try
         let candidates = filter(copy(candidates),
-              \ 'v:val.word =~ ' . string(input))
+              \ 'v:val.word =~ ' . string(s:get_migemo_pattern(input)))
       catch
       endtry
     endif
@@ -72,6 +107,16 @@ function! s:matcher.filter(candidates, context)"{{{
 
   return candidates
 endfunction"}}}
+
+function! s:get_migemo_pattern(input)
+  if has('migemo')
+    " Use migemo().
+    return migemo(a:input)
+  else
+    " Use cmigemo.
+    return vimproc#system('cmigemo -v -w "'.a:input.'" -d "'.s:migemodict.'"')
+  endif
+endfunction
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

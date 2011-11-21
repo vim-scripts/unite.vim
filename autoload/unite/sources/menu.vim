@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: file_point.vim
-" AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 17 Oct 2011.
+" FILE: menu.vim
+" AUTHOR:  Shougo Matsushita <Shougo.Matsu at gmail.com>
+" Last Modified: 11 Oct 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,47 +27,64 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#sources#file_point#define()"{{{
+call unite#util#set_default('g:unite_source_menu_menus', {})
+
+function! unite#sources#menu#define()
   return s:source
-endfunction"}}}
+endfunction
 
 let s:source = {
-      \ 'name' : 'file_point',
-      \ 'description' : 'file candidate from cursor point',
-      \ 'hooks' : {},
+      \ 'name' : 'menu',
+      \ 'description' : 'candidates from user defined menus',
       \}
-function! s:source.hooks.on_init(args, context)"{{{
-  let filename_pattern = '[[:alnum:];/?:@&=+$_.!~|()-]\+'
-  let filename = expand(matchstr(getline('.')[: col('.')-1], filename_pattern . '$')
-        \ . matchstr(getline('.')[col('.') :], '^'.filename_pattern))
-  let a:context.source__filename =
-        \ (filename =~ '^\%(https\?\|ftp\)://') ?
-        \ filename : fnamemodify(filename, ':p')
-endfunction"}}}
 
 function! s:source.gather_candidates(args, context)"{{{
-  if a:context.source__filename =~ '^\%(https\?\|ftp\)://'
-    " URI.
-    return [{
-          \   'word' : a:context.source__filename,
-          \   'kind' : 'uri',
-          \   'action__path' : a:context.source__filename,
-          \ }]
-  elseif filereadable(a:context.source__filename)
-    return [{
-          \   'word' : a:context.source__filename,
-          \   'kind' : 'file',
-          \   'action__path' : a:context.source__filename,
-          \   'action__directory' : unite#util#path2directory(
-          \               a:context.source__filename),
-          \ }]
-  else
-    " File not found.
+  let menu_name = get(a:args, 0, '')
+  if menu_name == ''
+    " All menus.
+    return values(map(copy(g:unite_source_menu_menus), "{
+          \ 'word' : v:key,
+          \ 'abbr' : (v:key . (has_key(v:val, 'description') ?
+          \                   ' - ' . v:val.description : '')),
+          \ 'kind' : 'source',
+          \ 'action__source_name' : 'menu',
+          \ 'action__source_args' : [v:key],
+          \ }"))
+  endif
+
+  " Check menu name.
+  if !has_key(g:unite_source_menu_menus, menu_name)
+    call unite#print_error('[menu] Invalid menu name : ' . menu_name)
     return []
   endif
+
+  let menu = g:unite_source_menu_menus[menu_name]
+  if has_key(menu, 'map')
+    let candidates = []
+    if type(menu.candidates) == type([])
+      let key = 1
+      for value in menu.candidates
+        call add(candidates, menu.map(key, value))
+        let key += 1
+      endfor
+    else
+      for [key, value] in items(menu.candidates)
+        call add(candidates, menu.map(key, value))
+      endfor
+    endif
+  else
+    let candidates = copy(menu.candidates)
+  endif
+
+  if type(candidates) == type({})
+    let save_candidates = candidates
+    unlet candidates
+    let candidates = values(save_candidates)
+  endif
+
+  return sort(candidates)
 endfunction"}}}
+
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
-
-" vim: foldmethod=marker

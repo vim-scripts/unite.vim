@@ -2,7 +2,7 @@
 " FILE: grep.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu at gmail.com>
 "          Tomohiro Nishimura <tomohiro68 at gmail.com>
-" Last Modified: 10 Aug 2011.
+" Last Modified: 16 Nov 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -40,7 +40,9 @@ let s:action_grep_file = {
   \   'is_selectable': 1,
   \ }
 function! s:action_grep_file.func(candidates) "{{{
-  call unite#start([['grep', map(copy(a:candidates), 'v:val.action__path')]])
+  call unite#start([['grep', map(copy(a:candidates),
+        \ 'substitute(v:val.action__path, "/$", "", "g")'),
+        \ g:unite_source_grep_recursive_opt]], { 'no_quit' : 1 })
 endfunction "}}}
 
 let s:action_grep_directory = {
@@ -50,7 +52,8 @@ let s:action_grep_directory = {
   \   'is_selectable': 1,
   \ }
 function! s:action_grep_directory.func(candidates) "{{{
-  call unite#start([['grep', map(copy(a:candidates), 'v:val.action__directory'), g:unite_source_grep_recursive_opt]])
+  call unite#start([['grep', map(copy(a:candidates), 'v:val.action__directory'),
+        \ g:unite_source_grep_recursive_opt]], { 'no_quit' : 1 })
 endfunction "}}}
 if executable(g:unite_source_grep_command) && unite#util#has_vimproc()
   call unite#custom_action('file,buffer', 'grep', s:action_grep_file)
@@ -59,13 +62,8 @@ endif
 " }}}
 
 function! unite#sources#grep#define() "{{{
-  if !exists('*unite#version') || unite#version() <= 100
-    echoerr 'Your unite.vim is too old.'
-    echoerr 'Please install unite.vim Ver.1.1 or above.'
-    return []
-  endif
-
-  return executable(g:unite_source_grep_command) && unite#util#has_vimproc() ? s:grep_source : []
+  return executable(g:unite_source_grep_command) && unite#util#has_vimproc() ?
+        \ s:grep_source : []
 endfunction "}}}
 
 let s:grep_source = {
@@ -77,26 +75,28 @@ let s:grep_source = {
       \ }
 
 function! s:grep_source.hooks.on_init(args, context) "{{{
-  let l:target  = get(a:args, 0, '')
-  if type(l:target) != type([])
-    if l:target == ''
-      let l:target = input('Target: ', '**', 'file')
-    endif
-
-    if l:target == '%' || l:target == '#'
-      let l:target = unite#util#escape_file_searching(bufname(l:target))
-    elseif l:target ==# '$buffers'
-      let l:target = join(map(filter(range(1, bufnr('$')), 'buflisted(v:val)'),
-            \ 'unite#util#escape_file_searching(bufname(v:val))'))
-    elseif l:target == '**'
-      " Optimized.
-      let l:target = '* ' . g:unite_source_grep_recursive_opt
-    endif
-
-    let a:context.source__target = [l:target]
+  if type(get(a:args, 0, '')) == type([])
+    let default = join(get(a:args, 0, ''))
   else
-    let a:context.source__target = l:target
+    let default = get(a:args, 0, '')
   endif
+  if default == ''
+    let default = '**'
+  endif
+
+  let target = input('Target: ', default, 'file')
+
+  if target == '%' || target == '#'
+    let target = unite#util#escape_file_searching(bufname(target))
+  elseif target ==# '$buffers'
+    let target = join(map(filter(range(1, bufnr('$')), 'buflisted(v:val)'),
+          \ 'unite#util#escape_file_searching(bufname(v:val))'))
+  elseif target == '**'
+    " Optimized.
+    let target = '* ' . g:unite_source_grep_recursive_opt
+  endif
+
+  let a:context.source__target = [target]
 
   let a:context.source__extra_opts = get(a:args, 1, '')
 
@@ -104,9 +104,6 @@ function! s:grep_source.hooks.on_init(args, context) "{{{
   if a:context.source__input == ''
     let a:context.source__input = input('Pattern: ')
   endif
-
-  call unite#print_message('[grep] Target: ' . join(a:context.source__target))
-  call unite#print_message('[grep] Pattern: ' . a:context.source__input)
 endfunction"}}}
 function! s:grep_source.hooks.on_syntax(args, context)"{{{
   syntax case ignore
@@ -130,20 +127,18 @@ function! s:grep_source.gather_candidates(args, context) "{{{
   endif
 
   if a:context.is_redraw
-    call unite#print_message('[grep] Target: ' . join(a:context.source__target))
-    call unite#print_message('[grep] Pattern: ' . a:context.source__input)
     let a:context.is_async = 1
   endif
 
-  let l:cmdline = printf('%s %s ''%s'' %s %s',
+  let cmdline = printf('%s %s %s ''%s'' %s',
     \   g:unite_source_grep_command,
     \   g:unite_source_grep_default_opts,
+    \   a:context.source__extra_opts,
     \   substitute(a:context.source__input, "'", "''", 'g'),
     \   join(a:context.source__target),
-    \   a:context.source__extra_opts)
-  call unite#print_message('[grep] Command-line: ' . l:cmdline)
-  let a:context.source__proc = vimproc#pgroup_open(l:cmdline)
-  " let a:context.source__proc = vimproc#popen3(l:cmdline)
+    \)
+  call unite#print_message('[grep] Command-line: ' . cmdline)
+  let a:context.source__proc = vimproc#pgroup_open(cmdline)
 
   " Close handles.
   call a:context.source__proc.stdin.close()
@@ -153,19 +148,19 @@ function! s:grep_source.gather_candidates(args, context) "{{{
 endfunction "}}}
 
 function! s:grep_source.async_gather_candidates(args, context) "{{{
-  let l:stdout = a:context.source__proc.stdout
-  if l:stdout.eof
+  let stdout = a:context.source__proc.stdout
+  if stdout.eof
     " Disable async.
     call unite#print_message('[grep] Completed.')
     let a:context.is_async = 0
   endif
 
-  let l:candidates = map(filter(map(l:stdout.read_lines(-1, 300),
+  let candidates = map(filter(map(stdout.read_lines(-1, 300),
         \ 'iconv(v:val, &termencoding, &encoding)'),
     \  'v:val =~ "^.\\+:.\\+:.\\+$"'),
     \ '[v:val, split(v:val[2:], ":")]')
 
-  return map(l:candidates,
+  return map(candidates,
     \ '{
     \   "word": v:val[0],
     \   "kind": "jump_list",

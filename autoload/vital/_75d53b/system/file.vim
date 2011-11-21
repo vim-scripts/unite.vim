@@ -15,25 +15,25 @@ function! s:open(filename) "{{{
   " Detect desktop environment.
   if s:is_windows
     " For URI only.
-    silent execute '!start rundll32 url.dll,FileProtocolHandler' l:filename
+    silent execute '!start rundll32 url.dll,FileProtocolHandler' filename
   elseif s:is_cygwin
     " Cygwin.
-    call system(printf('%s ''%s''', 'cygstart', l:filename))
+    call system(printf('%s ''%s''', 'cygstart', filename))
   elseif executable('xdg-open')
     " Linux.
-    call system(printf('%s ''%s'' &', 'xdg-open', l:filename))
+    call system(printf('%s ''%s'' &', 'xdg-open', filename))
   elseif exists('$KDE_FULL_SESSION') && $KDE_FULL_SESSION ==# 'true'
     " KDE.
-    call system(printf('%s ''%s'' &', 'kioclien exec', l:filename))
+    call system(printf('%s ''%s'' &', 'kioclien exec', filename))
   elseif exists('$GNOME_DESKTOP_SESSION_ID')
     " GNOME.
-    call system(printf('%s ''%s'' &', 'gnome-open', l:filename))
+    call system(printf('%s ''%s'' &', 'gnome-open', filename))
   elseif executable('exo-open')
     " Xfce.
-    call system(printf('%s ''%s'' &', 'exo-open', l:filename))
+    call system(printf('%s ''%s'' &', 'exo-open', filename))
   elseif s:is_mac && executable('open')
     " Mac OS.
-    call system(printf('%s ''%s'' &', 'open', l:filename))
+    call system(printf('%s ''%s'' &', 'open', filename))
   else
     " Give up.
     throw 'Not supported.'
@@ -66,13 +66,7 @@ endfunction
 " Move a file.
 " Implemented by pure vimscript.
 function! s:move_file_pure(src, dest) "{{{
-    let copy_success = s:copy_file(a:src, a:dest)
-    let remove_success = delete(a:src) == 0
-    if copy_success && remove_success
-        return 1
-    else
-        return 0
-    endif
+    return !rename(a:src, a:dest)
 endfunction "}}}
 
 " Copy a file.

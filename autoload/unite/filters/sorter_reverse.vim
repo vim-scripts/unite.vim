@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: resume.vim
+" FILE: sorter_reverse.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 17 Oct 2011.
+" Last Modified: 01 Sep 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,39 +27,17 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#sources#resume#define()"{{{
-  return s:source
+function! unite#filters#sorter_reverse#define()"{{{
+  return s:sorter
 endfunction"}}}
 
-let s:source = {
-      \ 'name' : 'resume',
-      \ 'description' : 'candidates from resume list',
+let s:sorter = {
+      \ 'name' : 'sorter_reverse',
+      \ 'description' : 'sort by reverse order',
       \}
 
-function! s:source.gather_candidates(args, context)"{{{
-  let a:context.source__buffer_list = filter(range(1, bufnr('$')),
-        \ 'getbufvar(v:val, "&filetype") ==# "unite"
-        \  && !getbufvar(v:val, "unite").context.temporary
-        \  && getbufvar(v:val, "unite").sources[0].name != "resume"')
-
-  let max_width = max(map(copy(a:context.source__buffer_list),
-        \ 'len(getbufvar(v:val, "unite").buffer_name)'))
-  let candidates = map(copy(a:context.source__buffer_list), '{
-        \ "word" : getbufvar(v:val, "unite").buffer_name,
-        \ "abbr" : printf("%-".max_width."s : "
-        \          . join(map(copy(getbufvar(v:val, "unite").sources), "v:val.name"), ", "),
-        \            getbufvar(v:val, "unite").buffer_name),
-        \ "kind" : "command",
-        \ "action__command" : "UniteResume " . getbufvar(v:val, "unite").buffer_name,
-        \ "source__time" : getbufvar(v:val, "unite").access_time,
-        \}')
-
-  return sort(candidates, 's:compare')
-endfunction"}}}
-
-" Misc.
-function! s:compare(candidate_a, candidate_b)"{{{
-  return a:candidate_b.source__time - a:candidate_a.source__time
+function! s:sorter.filter(candidates, context)"{{{
+  return reverse(a:candidates)
 endfunction"}}}
 
 let &cpo = s:save_cpo
