@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: mappings.vim
 " AUTHOR: Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 20 Nov 2011.
+" Last Modified: 22 Apr 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -39,7 +39,8 @@ function! unite#mappings#define_default_mappings()"{{{
   nnoremap <expr><buffer> <Plug>(unite_insert_enter)
         \ <SID>insert_enter('i')
   nnoremap <expr><buffer> <Plug>(unite_insert_head)
-        \ <SID>insert_enter('0'.(len(unite#get_current_unite().prompt)-1).'li')
+        \ <SID>insert_enter('A'.
+        \  (repeat("\<Left>", len(substitute(unite#get_input(), '.', 'x', 'g')))))
   nnoremap <expr><buffer> <Plug>(unite_append_enter)
         \ <SID>insert_enter('a')
   nnoremap <expr><buffer> <Plug>(unite_append_end)
@@ -100,11 +101,12 @@ function! unite#mappings#define_default_mappings()"{{{
   inoremap <silent><buffer> <Plug>(unite_exit)
         \ <ESC>:<C-u>call <SID>exit()<CR>
   inoremap <silent><expr><buffer> <Plug>(unite_insert_leave)
-        \ (line('.') <= unite#get_current_unite().prompt_linenr) ?
-        \ "\<ESC>0".(unite#get_current_unite().prompt_linenr+1)."G" : "\<ESC>0"
+        \ ((line('.') <= unite#get_current_unite().prompt_linenr) ?
+        \ "\<ESC>0".(unite#get_current_unite().prompt_linenr+1)."G" : "\<ESC>0")
+        \ . ":call unite#redraw()\<CR>"
   inoremap <silent><expr><buffer> <Plug>(unite_delete_backward_char)
         \ col('.') <= (len(unite#get_current_unite().prompt)+1) ?
-        \ "\<C-o>:\<C-u>call \<SID>exit()\<Cr>" : "\<C-h>"
+        \ "\<C-o>:\<C-u>call \<SID>exit()\<CR>" : "\<C-h>"
   inoremap <expr><buffer> <Plug>(unite_delete_backward_line)
         \ repeat("\<C-h>", col('.')-(len(unite#get_current_unite().prompt)+1))
   inoremap <expr><buffer> <Plug>(unite_delete_backward_word)
@@ -139,16 +141,18 @@ function! unite#mappings#define_default_mappings()"{{{
         \ <C-o>:<C-u>call <SID>input_directory()<CR>
   inoremap <silent><buffer><expr> <Plug>(unite_do_default_action)
         \ unite#do_action(unite#get_current_unite().context.default_action)
-  inoremap <buffer><silent> <Plug>(unite_toggle_transpose_window)
+  inoremap <silent><buffer> <Plug>(unite_toggle_transpose_window)
         \ <C-o>:<C-u>call <SID>toggle_transpose_window()<CR>
-  inoremap <buffer><silent> <Plug>(unite_toggle_auto_preview)
+  inoremap <silent><buffer> <Plug>(unite_toggle_auto_preview)
         \ <C-o>:<C-u>call <SID>toggle_auto_preview()<CR>
-  inoremap <buffer><silent> <Plug>(unite_narrowing_path)
+  inoremap <silent><buffer> <Plug>(unite_narrowing_path)
         \ <C-o>:<C-u>call <SID>narrowing_path()<CR>
-  inoremap <buffer><silent> <Plug>(unite_narrowing_input_history)
+  inoremap <silent><buffer> <Plug>(unite_narrowing_input_history)
         \ <C-o>:<C-u>call <SID>narrowing_input_history()<CR>
-  inoremap <buffer><silent> <Plug>(unite_toggle_max_candidates)
+  inoremap <silent><buffer> <Plug>(unite_toggle_max_candidates)
         \ <C-o>:<C-u>call <SID>toggle_max_candidates()<CR>
+  inoremap <silent><buffer> <Plug>(unite_redraw)
+        \ <C-o>:<C-u>call <SID>redraw()<CR>
   "}}}
 
   if exists('g:unite_no_default_keymappings') && g:unite_no_default_keymappings
@@ -218,6 +222,8 @@ function! unite#mappings#define_default_mappings()"{{{
   imap <buffer> <C-w>     <Plug>(unite_delete_backward_word)
   imap <buffer> <C-a>     <Plug>(unite_move_head)
   imap <buffer> <Home>    <Plug>(unite_move_head)
+  imap <buffer> <C-l>     <Plug>(unite_redraw)
+  imap <buffer> <ESC>     <Plug>(unite_insert_leave)
 
   inoremap <silent><buffer><expr> d
         \ unite#smart_map('d', unite#do_action('delete'))
@@ -244,6 +250,8 @@ function! unite#mappings#narrowing(word)"{{{
   endif
 endfunction"}}}
 function! unite#mappings#do_action(action_name, ...)"{{{
+  call unite#redraw()
+
   let candidates = get(a:000, 0, unite#get_marked_candidates())
   let new_context = get(a:000, 1, {})
   let is_clear_marks = get(a:000, 2, 1)
@@ -292,16 +300,26 @@ function! unite#mappings#do_action(action_name, ...)"{{{
 
   " Execute action.
   let is_redraw = 0
-  let is_quit = 0
   let _ = []
   for table in action_tables
     " Check quit flag.
     if table.action.is_quit
       call unite#all_quit_session(0)
-      let is_quit = 1
     endif
 
-    call add(_, table.action.func(table.candidates))
+    try
+      call add(_, table.action.func(table.candidates))
+    catch /^Vim\%((\a\+)\)\=:E325/
+      " Ignore catch.
+      call unite#print_error(v:exception)
+      call unite#print_error('Attenssion: Swap file is found in executing action!')
+      call unite#print_error('Action name is ' . table.action.name)
+    catch
+      call unite#print_error(v:throwpoint)
+      call unite#print_error(v:exception)
+      call unite#print_error('Error occured in executing action!')
+      call unite#print_error('Action name is ' . table.action.name)
+    endtry
 
     " Check invalidate cache flag.
     if table.action.is_invalidate_cache
@@ -343,10 +361,12 @@ function! s:get_action_table(action_name, candidates, sources)"{{{
   for candidate in a:candidates
     let action_table = s:get_candidate_action_table(candidate, a:sources)
 
-    let action_name =
-          \ a:action_name ==# 'default' ?
-          \ unite#get_default_action(candidate.source, candidate.kind)
-          \ : a:action_name
+    let action_name = a:action_name
+    if action_name ==# 'default'
+      " Get default action.
+      let action_name = unite#get_default_action(
+            \ candidate.source, candidate.kind)
+    endif
 
     if !has_key(action_table, action_name)
       call unite#util#print_error(candidate.abbr . '(' . candidate.source . ')')
@@ -499,8 +519,9 @@ function! unite#mappings#_choose_action(candidates)"{{{
 
   let unite = unite#get_current_unite()
 
-  call unite#start_temporary([[s:source_action] + a:candidates],
-        \ { 'source__sources' : unite.sources }, 'action')
+  call unite#start_temporary([[s:source_action] + a:candidates], {
+        \ 'source__sources' : unite.sources,
+        \ }, 'action')
 endfunction"}}}
 function! s:insert_enter(key)"{{{
   setlocal modifiable
@@ -541,7 +562,8 @@ function! s:print_candidate()"{{{
   endif
 
   let candidate = unite#get_current_candidate()
-  echo candidate.word
+  echo 'abbr: ' . candidate.abbr
+  echo 'word: ' . candidate.word
 endfunction"}}}
 function! s:insert_selected_candidate()"{{{
   if line('.') <= unite#get_current_unite().prompt_linenr
@@ -577,17 +599,23 @@ function! unite#mappings#_quick_match(is_choose)"{{{
 
   let unite = unite#get_current_unite()
 
-  if has_key(quick_match_table, char)
-        \ && quick_match_table[char] < len(unite.candidates)
-    let candidates = [ unite.candidates[quick_match_table[char]] ]
-    if a:is_choose
-      call unite#mappings#_choose_action(candidates)
-    else
-      call unite#mappings#do_action(
-            \ unite.context.default_action, candidates)
-    endif
-  else
+  if !has_key(quick_match_table, char)
+        \ || quick_match_table[char] >= len(unite.candidates)
     call unite#util#print_error('Canceled.')
+    return
+  endif
+
+  let candidate = unite.candidates[quick_match_table[char]]
+  if candidate.is_dummy
+    call unite#util#print_error('Canceled.')
+    return
+  endif
+
+  if a:is_choose
+    call unite#mappings#_choose_action([candidate])
+  else
+    call unite#mappings#do_action(
+          \ unite.context.default_action, [candidate])
   endif
 endfunction"}}}
 function! s:input_directory()"{{{
@@ -598,6 +626,10 @@ endfunction"}}}
 function! s:loop_cursor_down(is_skip_not_matched)"{{{
   let is_insert = mode() ==# 'i'
   let prompt_linenr = unite#get_current_unite().prompt_linenr
+
+  if line('.') <= prompt_linenr && !is_insert
+    return 'j'
+  endif
 
   if line('.') == line('$')
     " Loop.
@@ -639,11 +671,15 @@ function! s:loop_cursor_up(is_skip_not_matched)"{{{
   let prompt_linenr = unite#get_current_unite().prompt_linenr
 
   if line('.') <= prompt_linenr
-    " Loop.
-    if is_insert
-      return "\<C-End>\<Home>"
+    if is_insert || line('.') <= 2
+      " Loop.
+      if is_insert
+        return "\<C-End>\<Home>"
+      else
+        return 'G'
+      endif
     else
-      return 'G'
+      return 'k'
     endif
   endif
 
@@ -762,6 +798,10 @@ function! s:source_action.hooks.on_syntax(args, context)"{{{
 endfunction"}}}
 
 function! s:source_action.gather_candidates(args, context)"{{{
+  if empty(a:args)
+    return
+  endif
+
   let candidates = copy(a:args)
 
   " Print candidates.
@@ -784,14 +824,14 @@ function! s:source_action.gather_candidates(args, context)"{{{
 
   let sources = map(copy(candidates), 'v:val.source')
 
-  return sort(map(filter(values(uniq_actions), 'v:val.is_listed'), '{
-        \   "word" : v:val.name,
-        \   "abbr" : printf("%-' . max . 's -- %s",
+  return sort(map(filter(values(uniq_actions), 'v:val.is_listed'), "{
+        \   'word' : v:val.name,
+        \   'abbr' : printf('%-" . max . "s -- %s',
         \       v:val.name, v:val.description),
-        \   "source__candidates" : candidates,
-        \   "action__action" : v:val,
-        \   "source__sources" : sources,
-        \ }'), 's:compare_word')
+        \   'source__candidates' : candidates,
+        \   'action__action' : v:val,
+        \   'source__sources' : sources,
+        \ }"), 's:compare_word')
 endfunction"}}}
 
 function! s:compare_word(i1, i2)
@@ -840,8 +880,8 @@ let s:source_input = {
 
 function! s:source_input.gather_candidates(args, context)"{{{
   let context = unite#get_context()
-  let inputs = unite#get_buffer_name_option(
-        \ context.old_buffer_info[0].buffer_name, 'unite__inputs')
+  let inputs = unite#get_profile(
+        \ context.old_buffer_info[0].profile_name, 'unite__inputs')
   let key = context.old_source_names_string
   if !has_key(inputs, key)
     return []
@@ -872,8 +912,8 @@ let s:source_input.action_table.delete = {
       \ }
 function! s:source_input.action_table.delete.func(candidates)"{{{
   let context = unite#get_context()
-  let inputs = unite#get_buffer_name_option(
-        \ context.old_buffer_info[0].buffer_name, 'unite__inputs')
+  let inputs = unite#get_profile(
+        \ context.old_buffer_info[0].profile_name, 'unite__inputs')
   let key = context.old_source_names_string
   if !has_key(inputs, key)
     return

@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: file_rec.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 20 Nov 2011.
+" Last Modified: 04 May 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -28,14 +28,20 @@ let s:save_cpo = &cpo
 set cpo&vim
 
 " Variables  "{{{
-call unite#util#set_default('g:unite_source_file_rec_ignore_pattern',
-      \'\%(^\|/\)\.$\|\~$\|\.\%(o\|exe\|dll\|bak\|sw[po]\)$\|\%(^\|/\)\.\%(hg\|git\|bzr\|svn\)\%($\|/\)')
-call unite#util#set_default('g:unite_source_file_rec_min_cache_files', 50)
+call unite#util#set_default(
+      \ 'g:unite_source_file_rec_ignore_pattern',
+      \'\%(^\|/\)\.$\|\~$\|\.\%(o\|exe\|dll\|bak\|sw[po]\|class\)$'.
+      \'\|\%(^\|/\)\.\%(hg\|git\|bzr\|svn\)\%($\|/\)')
+call unite#util#set_default(
+      \ 'g:unite_source_file_rec_min_cache_files', 100)
 "}}}
+
+let s:Cache = vital#of('unite.vim').import('System.Cache')
 
 function! unite#sources#file_rec#define()"{{{
   return [ s:source_rec ]
-        \ + [ executable('ls') && unite#util#has_vimproc() ? s:source_async : {} ]
+        \ + [ executable('find')
+        \   && unite#util#has_vimproc() ? s:source_async : {} ]
 endfunction"}}}
 
 let s:continuation = {}
@@ -49,9 +55,19 @@ let s:source_rec = {
       \ }
 
 function! s:source_rec.gather_candidates(args, context)"{{{
-  let directory = a:context.source__directory
+  let a:context.source__directory = s:get_path(a:args, a:context)
 
-  call unite#print_message('[file_rec] directory: ' . directory)
+  let directory = a:context.source__directory
+  if directory == ''
+    " Not in project directory.
+    call unite#print_source_message(
+          \ 'Not in project directory.', s:source_rec.name)
+    let a:context.is_async = 0
+    return []
+  endif
+
+  call unite#print_source_message(
+        \ 'directory: ' . directory, s:source_rec.name)
 
   call s:init_continuation(a:context, directory)
 
@@ -59,8 +75,10 @@ function! s:source_rec.gather_candidates(args, context)"{{{
 
   if empty(continuation.rest) || continuation.end
     " Disable async.
-    call unite#print_message('[file_rec] Directory traverse was completed.')
+    call unite#print_source_message(
+          \ 'Directory traverse was completed.', s:source_rec.name)
     let a:context.is_async = 0
+    let continuation.end = 1
   endif
 
   return continuation.files
@@ -69,10 +87,12 @@ endfunction"}}}
 function! s:source_rec.async_gather_candidates(args, context)"{{{
   let continuation = s:continuation[a:context.source__directory]
 
-  let [continuation.rest, files] = s:get_files(continuation.rest, 1, 20)
+  let [continuation.rest, files] =
+        \ s:get_files(continuation.rest, 1, 20)
 
   if empty(continuation.rest)
-    call unite#print_message('[file_rec] Directory traverse was completed.')
+    call unite#print_source_message(
+          \ 'Directory traverse was completed.', s:source_rec.name)
 
     " Disable async.
     let a:context.is_async = 0
@@ -99,12 +119,21 @@ function! s:source_rec.async_gather_candidates(args, context)"{{{
   endif
 
   let continuation.files += candidates
+  if empty(continuation.rest)
+        \ && g:unite_source_file_rec_min_cache_files > 0
+        \ && len(continuation.files) >
+        \ g:unite_source_file_rec_min_cache_files
+    let cache_dir = g:unite_data_directory . '/file_rec'
+
+    call s:Cache.writefile(cache_dir, a:context.source__directory,
+          \ map(copy(continuation.files), 'v:val.action__path'))
+  endif
 
   return candidates
 endfunction"}}}
 
-function! s:source_rec.hooks.on_init(args, context)"{{{
-  let a:context.source__directory = s:get_path(a:args, a:context)
+function! s:source_rec.hooks.on_pre_filter(args, context)"{{{
+  call s:on_pre_filter(a:args, a:context)
 endfunction"}}}
 function! s:source_rec.hooks.on_post_filter(args, context)"{{{
   call s:on_post_filter(a:args, a:context)
@@ -112,7 +141,9 @@ endfunction"}}}
 
 function! s:source_rec.vimfiler_check_filetype(args, context)"{{{
   let path = unite#util#substitute_path_separator(
-        \ simplify(fnamemodify(expand(get(a:args, 0, '')), ':p')))
+        \ unite#util#expand(join(a:args, ':')))
+  let path = unite#util#substitute_path_separator(
+        \ simplify(fnamemodify(path, ':p')))
 
   if isdirectory(path)
     let type = 'directory'
@@ -155,7 +186,7 @@ function! s:source_rec.vimfiler_gather_candidates(args, context)"{{{
     lcd `=path`
   endif
 
-  let exts = unite#util#is_win() ?
+  let exts = unite#util#is_windows() ?
         \ escape(substitute($PATHEXT . ';.LNK', ';', '\\|', 'g'), '.') : ''
 
   " Set vimfiler property.
@@ -171,7 +202,10 @@ function! s:source_rec.vimfiler_gather_candidates(args, context)"{{{
   return candidates
 endfunction"}}}
 function! s:source_rec.vimfiler_dummy_candidates(args, context)"{{{
-  let path = get(a:args, 0, '')
+  let path = unite#util#substitute_path_separator(
+        \ unite#util#expand(join(a:args, ':')))
+  let path = unite#util#substitute_path_separator(
+        \ simplify(fnamemodify(path, ':p')))
 
   if path == ''
     return []
@@ -183,7 +217,7 @@ function! s:source_rec.vimfiler_dummy_candidates(args, context)"{{{
     lcd `=path`
   endif
 
-  let exts = unite#util#is_win() ?
+  let exts = unite#util#is_windows() ?
         \ escape(substitute($PATHEXT . ';.LNK', ';', '\\|', 'g'), '.') : ''
 
   let is_relative_path = path !~ '^\%(/\|\a\+:/\)'
@@ -202,7 +236,12 @@ function! s:source_rec.vimfiler_dummy_candidates(args, context)"{{{
   return candidates
 endfunction"}}}
 function! s:source_rec.vimfiler_complete(args, context, arglead, cmdline, cursorpos)"{{{
-  return filter(split(glob(a:arglead . '*'), '\n'), 'isdirectory(v:val)')
+  return unite#sources#file#complete_directory(
+        \ a:args, a:context, a:arglead, a:cmdline, a:cursorpos)
+endfunction"}}}
+function! s:source_rec.complete(args, context, arglead, cmdline, cursorpos)"{{{
+  return unite#sources#file#complete_directory(
+        \ a:args, a:context, a:arglead, a:cmdline, a:cursorpos)
 endfunction"}}}
 
 " Source async.
@@ -214,36 +253,64 @@ let s:source_async = {
       \ }
 
 function! s:source_async.gather_candidates(args, context)"{{{
-  let directory = s:get_path(a:args, a:context)
+  let a:context.source__directory = s:get_path(a:args, a:context)
 
-  call unite#print_message('[file_rec/async] directory: ' . directory)
+  let directory = a:context.source__directory
+  if directory == ''
+    " Not in project directory.
+    call unite#print_source_message(
+          \ 'Not in project directory.', s:source_async.name)
+    let a:context.is_async = 0
+    return []
+  endif
+
+  call unite#print_source_message(
+        \ 'directory: ' . directory, s:source_async.name)
 
   call s:init_continuation(a:context, directory)
 
   let continuation = s:continuation[directory]
 
-  let a:context.source__directory = directory
-
   if empty(continuation.rest) || continuation.end
     " Disable async.
-    call unite#print_message('[file_rec/async] Directory traverse was completed.')
+    call unite#print_source_message(
+          \ 'Directory traverse was completed.', s:source_async.name)
     let a:context.is_async = 0
+    let continuation.end = 1
 
     return continuation.files
   endif
 
-  let a:context.source__proc = vimproc#pgroup_open('ls -R1 '
-        \ . escape(directory, ' '))
+  let a:context.source__proc = vimproc#pgroup_open(
+        \ printf('find ''%s'' -type f', directory))
 
   " Close handles.
   call a:context.source__proc.stdin.close()
-  call a:context.source__proc.stderr.close()
 
   return []
 endfunction"}}}
 
 function! s:source_async.async_gather_candidates(args, context)"{{{
+  let stderr = a:context.source__proc.stderr
+  if !stderr.eof
+    " Print error.
+    let errors = filter(stderr.read_lines(-1, 100),
+          \ "v:val !~ '^\\s*$'")
+    if !empty(errors)
+      call unite#print_source_error(errors, s:source_async.name)
+    endif
+  endif
+
   let continuation = s:continuation[a:context.source__directory]
+
+  let stdout = a:context.source__proc.stdout
+  if stdout.eof
+    " Disable async.
+    call unite#print_source_message(
+          \ 'Directory traverse was completed.', s:source_async.name)
+    let a:context.is_async = 0
+    let continuation.end = 1
+  endif
 
   let is_relative_path =
         \ a:context.source__directory ==
@@ -254,33 +321,17 @@ function! s:source_async.async_gather_candidates(args, context)"{{{
     lcd `=a:context.source__directory`
   endif
 
-  let stdout = a:context.source__proc.stdout
-  if stdout.eof
-    " Disable async.
-    call unite#print_message('[file_rec] Directory traverse was completed.')
-    let a:context.is_async = 0
-    let continuation.end = 1
-  endif
-
   let candidates = []
-  for line in map(stdout.read_lines(-1, 300),
-        \ 'iconv(v:val, &termencoding, &encoding)')
-    if line =~ ':$'
-      " Directory name.
-      let continuation.directory = line[: -2]
-      if continuation.directory !~ '/$'
-        let continuation.directory .= '/'
-      endif
-    elseif line != ''
-      let filename = continuation.directory.line
-      if g:unite_source_file_rec_ignore_pattern == ''
-          \ || filename !~ g:unite_source_file_rec_ignore_pattern
-        call add(candidates, {
-              \ 'word' : unite#util#substitute_path_separator(
-              \    fnamemodify(filename, ':.')),
-              \ 'action__path' : filename,
-              \ })
-      endif
+  for filename in map(filter(
+        \ stdout.read_lines(-1, 100), 'v:val != ""'),
+        \ "fnamemodify(iconv(v:val, 'char', &encoding), ':p')")
+    if (g:unite_source_file_rec_ignore_pattern == ''
+          \ || filename !~ g:unite_source_file_rec_ignore_pattern)
+      call add(candidates, {
+            \ 'word' : unite#util#substitute_path_separator(
+            \    fnamemodify(filename, ':.')),
+            \ 'action__path' : filename,
+            \ })
     endif
   endfor
 
@@ -289,6 +340,15 @@ function! s:source_async.async_gather_candidates(args, context)"{{{
   endif
 
   let continuation.files += candidates
+  if stdout.eof
+        \ && g:unite_source_file_rec_min_cache_files > 0
+        \ && len(continuation.files) >
+        \ g:unite_source_file_rec_min_cache_files
+    let cache_dir = g:unite_data_directory . '/file_rec'
+
+    call s:Cache.writefile(cache_dir, a:context.source__directory,
+          \ map(copy(continuation.files), 'v:val.action__path'))
+  endif
 
   return candidates
 endfunction"}}}
@@ -298,8 +358,16 @@ function! s:source_async.hooks.on_close(args, context) "{{{
     call a:context.source__proc.waitpid()
   endif
 endfunction "}}}
+function! s:source_async.hooks.on_pre_filter(args, context)"{{{
+  call s:on_pre_filter(a:args, a:context)
+endfunction"}}}
 function! s:source_async.hooks.on_post_filter(args, context)"{{{
   call s:on_post_filter(a:args, a:context)
+endfunction"}}}
+
+function! s:source_async.complete(args, context, arglead, cmdline, cursorpos)"{{{
+  return unite#sources#file#complete_directory(
+        \ a:args, a:context, a:arglead, a:cmdline, a:cursorpos)
 endfunction"}}}
 
 " Add custom action table."{{{
@@ -311,6 +379,16 @@ function! s:cdable_action_rec.func(candidate)
   call unite#start([['file_rec', a:candidate.action__directory]])
 endfunction
 
+let s:cdable_action_rec_parent = {
+      \ 'description' : 'open parent directory by file_rec source',
+      \}
+
+function! s:cdable_action_rec_parent.func(candidate)
+  call unite#start([['file_rec', unite#util#substitute_path_separator(
+        \ fnamemodify(a:candidate.action__directory, ':h'))
+        \ ]])
+endfunction
+
 let s:cdable_action_rec_async = {
       \ 'description' : 'open this directory by file_rec/async source',
       \}
@@ -319,18 +397,36 @@ function! s:cdable_action_rec_async.func(candidate)
   call unite#start([['file_rec/async', a:candidate.action__directory]])
 endfunction
 
+let s:cdable_action_rec_parent_async = {
+      \ 'description' : 'open parent directory by file_rec/async source',
+      \}
+
+function! s:cdable_action_rec_parent_async.func(candidate)
+  call unite#start([['file_rec/async', unite#util#substitute_path_separator(
+        \ fnamemodify(a:candidate.action__directory, ':h'))
+        \ ]])
+endfunction
+
 call unite#custom_action('cdable', 'rec', s:cdable_action_rec)
+call unite#custom_action('cdable', 'rec_parent', s:cdable_action_rec_parent)
 call unite#custom_action('cdable', 'rec/async', s:cdable_action_rec_async)
+call unite#custom_action('cdable', 'rec_parent/async', s:cdable_action_rec_parent_async)
 unlet! s:cdable_action_rec
 unlet! s:cdable_action_rec_async
 "}}}
 
 " Misc.
 function! s:get_path(args, context)"{{{
-  let directory = get(a:args, 0, '')
+  let directory = get(
+        \ filter(copy(a:args), "v:val != '!'"), 0, '')
   if directory == ''
     let directory = isdirectory(a:context.input) ?
           \ a:context.input : getcwd()
+  endif
+
+  if get(a:args, 0, '') == '!'
+    " Use project directory.
+    return unite#util#path2project_directory(directory, 1)
   endif
 
   return unite#util#substitute_path_separator(
@@ -358,11 +454,7 @@ function! s:get_files(files, level, max_len)"{{{
       endif
 
       let child_index = 0
-      let childs =
-            \ split(unite#util#substitute_path_separator(
-            \       globpath(file, '*')), '\n') +
-            \ split(unite#util#substitute_path_separator(
-            \       globpath(file, '.*')), '\n')
+      let childs = unite#util#glob(file.'/*') + unite#util#glob(file.'/.*')
       for child in childs
         let child_index += 1
 
@@ -405,7 +497,7 @@ function! s:get_files(files, level, max_len)"{{{
 
   let continuation_files += a:files[files_index :]
   return [continuation_files, map(ret_files,
-        \ 'unite#util#substitute_path_separator(fnamemodify(v:val, ":p"))')]
+        \ "unite#util#substitute_path_separator(fnamemodify(v:val, ':p'))")]
 endfunction"}}}
 function! s:on_post_filter(args, context)"{{{
   let is_relative_path =
@@ -421,11 +513,44 @@ function! s:on_post_filter(args, context)"{{{
           \ unite#util#path2directory(candidate.action__path)
   endfor
 endfunction"}}}
+function! s:on_pre_filter(args, context)"{{{
+  let a:context.candidates = unite#call_filter(
+        \ 'matcher_hide_hidden_files', a:context.candidates, a:context)
+endfunction"}}}
 function! s:init_continuation(context, directory)"{{{
+  let cache_dir = g:unite_data_directory . '/file_rec'
+  if !has_key(s:continuation, a:directory)
+        \ && s:Cache.filereadable(cache_dir, a:directory)
+    " Use cache file.
+
+    let is_relative_path =
+          \ a:context.source__directory ==
+          \   unite#util#substitute_path_separator(getcwd())
+
+    if !is_relative_path
+      let cwd = getcwd()
+      lcd `=a:context.source__directory`
+    endif
+
+    let files = map(s:Cache.readfile(cache_dir, a:directory), "{
+          \ 'word' : unite#util#substitute_path_separator(
+          \    fnamemodify(v:val, ':.')),
+          \ 'action__path' : v:val,
+          \ }")
+
+    let s:continuation[a:directory] = {
+          \ 'files' : files,
+          \ 'rest' : [],
+          \ 'directory' : a:directory, 'end' : 1,
+          \ }
+
+    if !is_relative_path
+      lcd `=cwd`
+    endif
+  endif
+
   if a:context.is_redraw
         \ || !has_key(s:continuation, a:directory)
-        \ || len(s:continuation[a:directory].files)
-        \      < g:unite_source_file_rec_min_cache_files
     let a:context.is_async = 1
 
     let s:continuation[a:directory] = {

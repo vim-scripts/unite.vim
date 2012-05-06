@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: history_yank.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 20 Nov 2011.
+" Last Modified: 23 Jan 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -29,6 +29,10 @@ set cpo&vim
 
 " Variables  "{{{
 let s:yank_histories = []
+let s:yank_histories_file_mtime = 0  " the last modified time of the yank histories file.
+
+call unite#util#set_default('g:unite_source_history_yank_file',
+      \ g:unite_data_directory . '/history_yank')
 
 call unite#util#set_default('g:unite_source_history_yank_limit', 100)
 "}}}
@@ -37,16 +41,22 @@ function! unite#sources#history_yank#define()"{{{
   return s:source
 endfunction"}}}
 function! unite#sources#history_yank#_append()"{{{
-  if empty(s:yank_histories) ||
-        \ s:yank_histories[0] != @"
-    " Append @" value.
-    call insert(s:yank_histories, @")
-
-    if g:unite_source_history_yank_limit > len(s:yank_histories)
-      let s:yank_histories =
-            \ s:yank_histories[ : g:unite_source_history_yank_limit - 1]
-    endif
+  if get(s:yank_histories, 0, '') ==# @"
+        \ || len(@") < 2
+    return
   endif
+
+  call s:load()
+
+  " Append @" value.
+  call insert(s:yank_histories, @")
+
+  if g:unite_source_history_yank_limit < len(s:yank_histories)
+    let s:yank_histories =
+          \ s:yank_histories[ : g:unite_source_history_yank_limit - 1]
+  endif
+
+  call s:save()
 endfunction"}}}
 
 let s:source = {
@@ -57,11 +67,8 @@ let s:source = {
 
 function! s:source.gather_candidates(args, context)"{{{
   let max_width = winwidth(0) - 5
-  let histories = map(copy(s:yank_histories), 'v:val[: max_width*2]')
-  return map(histories, "{
-        \ 'word' : v:val[: max_width],
-        \ 'abbr' : substitute(unite#util#truncate(v:val, max_width),
-        \         '\\t', '>---', 'g'),
+  return map(copy(s:yank_histories), "{
+        \ 'word' : v:val,
         \ 'kind' : 'word',
         \ 'is_multiline' : 1,
         \ }")
@@ -80,6 +87,36 @@ function! s:source.action_table.delete.func(candidates)"{{{
   endfor
 endfunction"}}}
 "}}}
+
+function! s:save()  "{{{
+  if g:unite_source_history_yank_file == ''
+    return
+  endif
+
+  call writefile([string(s:yank_histories)],
+        \              g:unite_source_history_yank_file)
+  let s:yank_histories_file_mtime = getftime(g:unite_source_history_yank_file)
+endfunction"}}}
+function! s:load()  "{{{
+  if !filereadable(g:unite_source_history_yank_file)
+  \  || s:yank_histories_file_mtime == getftime(g:unite_source_history_yank_file)
+    return
+  endif
+
+  let file = readfile(g:unite_source_history_yank_file)
+  if empty(file)
+    return
+  endif
+
+  try
+    sandbox let s:yank_histories = eval(file[0])
+  catch
+    let s:yank_histories = []
+  endtry
+
+  let s:yank_histories_file_mtime = getftime(g:unite_source_history_yank_file)
+endfunction"}}}
+
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

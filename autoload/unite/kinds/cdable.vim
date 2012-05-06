@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: cdable.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 21 Sep 2011.
+" Last Modified: 22 Feb 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -44,9 +44,7 @@ let s:kind.action_table.cd = {
 function! s:kind.action_table.cd.func(candidate)"{{{
   if &filetype ==# 'vimfiler' || &filetype ==# 'vimshell'
     call s:external_cd(a:candidate)
-  endif
-
-  if a:candidate.action__directory != ''
+  elseif a:candidate.action__directory != ''
     execute g:unite_kind_openable_cd_command '`=a:candidate.action__directory`'
   endif
 endfunction"}}}
@@ -57,10 +55,8 @@ let s:kind.action_table.lcd = {
 function! s:kind.action_table.lcd.func(candidate)"{{{
   if &filetype ==# 'vimfiler' || &filetype ==# 'vimshell'
     call s:external_cd(a:candidate)
-  endif
-
-  if a:candidate.action__directory != ''
-    execute g:unite_kind_openable_cd_command '`=a:candidate.action__directory`'
+  elseif a:candidate.action__directory != ''
+    execute g:unite_kind_openable_lcd_command '`=a:candidate.action__directory`'
   endif
 endfunction"}}}
 
@@ -105,7 +101,7 @@ if exists(':VimShell')
         \ 'description' : 'open vimshell buffer here',
         \ }
   function! s:kind.action_table.vimshell.func(candidate)"{{{
-    VimShell `=a:candidate.action__directory`
+    execute 'VimShell' escape(a:candidate.action__directory, '\ ')
   endfunction"}}}
 endif
 if exists(':VimShellTab')
@@ -113,7 +109,7 @@ if exists(':VimShellTab')
         \ 'description' : 'tabopen vimshell buffer here',
         \ }
   function! s:kind.action_table.tabvimshell.func(candidate)"{{{
-    VimShellTab `=a:candidate.action__directory`
+    execute 'VimShellTab' escape(a:candidate.action__directory, '\ ')
   endfunction"}}}
 endif
 if exists(':VimFiler')
@@ -121,7 +117,7 @@ if exists(':VimFiler')
         \ 'description' : 'open vimfiler buffer here',
         \ }
   function! s:kind.action_table.vimfiler.func(candidate)"{{{
-    call vimfiler#create_filer(a:candidate.action__directory)
+    execute 'VimFilerCreate' escape(a:candidate.action__directory, '\ ')
 
     if has_key(a:candidate, 'action__path')
           \ && a:candidate.action__directory !=# a:candidate.action__path
@@ -136,8 +132,14 @@ if exists(':VimFilerTab')
         \ 'description' : 'tabopen vimfiler buffer here',
         \ }
   function! s:kind.action_table.tabvimfiler.func(candidate)"{{{
-    tabnew | call vimfiler#create_filer(a:candidate.action__directory)
-    call s:move_vimfiler_cursor(a:candidate)
+    execute 'VimFilerTab' escape(a:candidate.action__directory, '\ ')
+
+    if has_key(a:candidate, 'action__path')
+          \ && a:candidate.action__directory !=# a:candidate.action__path
+      " Move cursor.
+      call vimfiler#mappings#search_cursor(a:candidate.action__path)
+      call s:move_vimfiler_cursor(a:candidate)
+    endif
   endfunction"}}}
 endif
 
@@ -146,7 +148,7 @@ function! s:external_cd(candidate)"{{{
     call vimfiler#mappings#cd(a:candidate.action__directory)
     call s:move_vimfiler_cursor(a:candidate)
   elseif &filetype ==# 'vimshell'
-    call vimshell#switch_shell(0, a:candidate.action__directory)
+    call vimshell#switch_shell(a:candidate.action__directory)
   endif
 endfunction"}}}
 function! s:move_vimfiler_cursor(candidate)"{{{

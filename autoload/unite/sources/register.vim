@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: register.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 20 Nov 2011.
+" Last Modified: 30 Dec 2011.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -42,12 +42,12 @@ function! s:source.gather_candidates(args, context)"{{{
 
   let max_width = winwidth(0) - 5
   let registers = [
-        \ '"',
+        \ '"', '+', '*',
         \ '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
         \ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
         \ 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
         \ 'u', 'v', 'w', 'x', 'y', 'z',
-        \ '-', '*', '+', '.', ':', '#', '%', '/', '=',
+        \ '-', '.', ':', '#', '%', '/', '=',
         \ ]
   if exists('g:yanktmp_file') && filereadable(g:yanktmp_file)
     call add(registers, 'yanktmp')
@@ -58,13 +58,9 @@ function! s:source.gather_candidates(args, context)"{{{
           \ join(readfile(g:yanktmp_file, "b"), "\n") :
           \ getreg(reg, 1)
     if register != ''
-      let register = register[: max_width * 2]
-      let abbr = substitute(unite#util#truncate(register, max_width),
-            \ '\t', '>---', 'g')
-
       call add(candidates, {
             \ 'word' : register,
-            \ 'abbr' : printf('%-3s - %s', reg, abbr),
+            \ 'abbr' : printf('%-3s - %s', reg, register),
             \ 'kind' : 'word',
             \ 'is_multiline' : 1,
             \ 'action__register' : reg,

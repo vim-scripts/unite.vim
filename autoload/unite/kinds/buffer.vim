@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: buffer.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 19 Sep 2011.
+" Last Modified: 08 Feb 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -47,6 +47,25 @@ function! s:kind.action_table.open.func(candidates)"{{{
   for candidate in a:candidates
     execute 'buffer' candidate.action__buffer_nr
   endfor
+endfunction"}}}
+
+let s:kind.action_table.goto = {
+      \ 'description' : 'goto buffer tab',
+      \ }
+function! s:kind.action_table.goto.func(candidate)"{{{
+  for i in range(tabpagenr('$'))
+    let tabnr = i + 1
+    for nr in tabpagebuflist(tabnr)
+      if nr == a:candidate.action__buffer_nr
+        execute 'tabnext' tabnr
+        execute bufwinnr(nr) 'wincmd w'
+
+        " Jump to the first.
+        return
+      endif
+    endfor
+  endfor
+  execute 'buffer' a:candidate.action__buffer_nr
 endfunction"}}}
 
 let s:kind.action_table.delete = {
@@ -128,13 +147,11 @@ function! s:kind.action_table.rename.func(candidates)"{{{
 
     let old_buffer_name = bufname(candidate.action__buffer_nr)
     let buffer_name = input(printf('New buffer name: %s -> ', old_buffer_name), old_buffer_name)
-    if buffer_name != '' && buffer_name !=# old_buffer_name
-      let bufnr = bufnr('%')
-      execute 'buffer' candidate.action__buffer_nr
-      saveas! `=buffer_name`
-      call delete(candidate.action__path)
-      execute 'buffer' bufnr
+    if buffer_name == '' || buffer_name ==# old_buffer_name
+      continue
     endif
+
+    call unite#kinds#file#do_rename(old_buffer_name, buffer_name)
   endfor
 endfunction"}}}
 "}}}
@@ -148,7 +165,11 @@ function! s:delete(delete_command, candidate)"{{{
     if winbufnr(winnr) == a:candidate.action__buffer_nr
       execute winnr . 'wincmd w'
       call unite#util#alternate_buffer()
-      wincmd p
+
+      let unite_winnr = bufwinnr(unite#get_current_unite().bufnr)
+      if unite_winnr > 0
+        execute unite_winnr 'wincmd w'
+      endif
     endif
 
     let winnr += 1

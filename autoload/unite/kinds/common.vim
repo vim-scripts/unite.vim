@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: common.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 17 Oct 2011.
+" Last Modified: 21 Feb 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -46,21 +46,21 @@ function! s:kind.action_table.nop.func(candidate)"{{{
 endfunction"}}}
 
 let s:kind.action_table.yank = {
-      \ 'description' : 'yank text',
+      \ 'description' : 'yank word or text',
       \ 'is_selectable' : 1,
       \ }
 function! s:kind.action_table.yank.func(candidates)"{{{
-  let @" = join(map(copy(a:candidates), 'v:val.word'), "\n")
+  let @" = join(map(copy(a:candidates), 's:get_candidate_text(v:val)'), "\n")
   if has('clipboard')
     let @* = @"
   endif
 endfunction"}}}
 
 let s:kind.action_table.yank_escape = {
-      \ 'description' : 'yank escaped text',
+      \ 'description' : 'yank escaped word or text',
       \ }
 function! s:kind.action_table.yank_escape.func(candidate)"{{{
-  let @" = escape(a:candidate.word, " *?[{`$\\%#\"|!<>")
+  let @" = escape(s:get_candidate_text(a:candidate), " *?[{`$\\%#\"|!<>")
 endfunction"}}}
 
 let s:kind.action_table.ex = {
@@ -69,19 +69,55 @@ let s:kind.action_table.ex = {
       \ }
 function! s:kind.action_table.ex.func(candidates)"{{{
   " Result is ':| {candidate}', here '|' means the cursor position.
-  call feedkeys(printf(": %s\<C-b>", join(map(map(copy(a:candidates), 'v:val.word'), 'escape(v:val, " *?[{`$\\%#\"|!<>")'))), 'n')
+  call feedkeys(printf(": %s\<C-b>",
+        \ join(map(map(copy(a:candidates), 'v:val.word'),
+        \ 'escape(v:val, " *?[{`$\\%#\"|!<>")'))), 'n')
 endfunction"}}}
 
 let s:kind.action_table.insert = {
-      \ 'description' : 'insert word',
+      \ 'description' : 'insert word or text',
       \ }
 function! s:kind.action_table.insert.func(candidate)"{{{
+  call s:insert_word(s:get_candidate_text(a:candidate))
+endfunction"}}}
+
+let s:kind.action_table.insert_directory = {
+      \ 'description' : 'insert directory',
+      \ }
+function! s:kind.action_table.insert_directory.func(candidate)"{{{
+  let context = unite#get_current_unite().context
+
+  if has_key(a:candidate,'action__directory')
+      let directory = a:candidate.action__directory
+  elseif has_key(a:candidate, 'action__path')
+      let directory = unite#util#substitute_path_separator(
+            \ fnamemodify(a:candidate.action__path, ':p:h'))
+  elseif has_key(a:candidate, 'word') && isdirectory(a:candidate.word)
+      let directory = a:candidate.word
+  else
+      return
+  endif
+
+  call s:insert_word(directory)
+endfunction"}}}
+
+let s:kind.action_table.preview = {
+      \ 'description' : 'preview word',
+      \ 'is_quit' : 0,
+      \ }
+function! s:kind.action_table.preview.func(candidate)"{{{
+  redraw
+  echo s:get_candidate_text(a:candidate)
+endfunction"}}}
+"}}}
+
+function! s:insert_word(word)"{{{
   let context = unite#get_current_unite().context
 
   if !context.complete
     " Paste.
     let old_reg = @"
-    let @" = a:candidate.word
+    let @" = a:word
     normal! ""p
     let @" = old_reg
 
@@ -93,9 +129,9 @@ function! s:kind.action_table.insert.func(candidate)"{{{
 
   let next_line = getline('.')[context.col :]
   call setline(line('.'),
-        \ split(cur_text . a:candidate.word . next_line,
+        \ split(cur_text . a:word . next_line,
         \            '\n\|\r\n'))
-  let next_col = len(cur_text)+len(a:candidate.word)+1
+  let next_col = len(cur_text)+len(a:word)+1
   call cursor('', next_col)
 
   if next_col < col('$')
@@ -104,16 +140,9 @@ function! s:kind.action_table.insert.func(candidate)"{{{
     startinsert!
   endif
 endfunction"}}}
-
-let s:kind.action_table.preview = {
-      \ 'description' : 'preview word',
-      \ 'is_quit' : 0,
-      \ }
-function! s:kind.action_table.preview.func(candidate)"{{{
-  redraw
-  echo a:candidate.word
+function! s:get_candidate_text(candidate)"{{{
+  return get(a:candidate, 'action__text', a:candidate.word)
 endfunction"}}}
-"}}}
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

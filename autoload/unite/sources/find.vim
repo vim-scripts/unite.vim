@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: find.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu at gmail.com>
-" Last Modified: 16 Nov 2011.
+" Last Modified: 03 May 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,6 +27,9 @@
 " Variables  "{{{
 call unite#util#set_default('g:unite_source_find_command', 'find')
 call unite#util#set_default('g:unite_source_find_max_candidates', 100)
+call unite#util#set_default('g:unite_source_find_ignore_pattern',
+      \'\~$\|\.\%(bak\|sw[po]\)$\|'.
+      \'\%(^\|/\)\.\%(hg\|git\|bzr\|svn\)\%($\|/\)')
 "}}}
 
 " Actions "{{{
@@ -45,17 +48,17 @@ endif
 
 function! unite#sources#find#define() "{{{
   return executable(g:unite_source_find_command) && unite#util#has_vimproc() ?
-        \ s:find_source : []
+        \ s:source : []
 endfunction "}}}
 
-let s:find_source = {
+let s:source = {
       \ 'name': 'find',
       \ 'max_candidates': g:unite_source_find_max_candidates,
       \ 'hooks' : {},
       \ 'filters' : ['matcher_regexp', 'sorter_default', 'converter_relative'],
       \ }
 
-function! s:find_source.hooks.on_init(args, context) "{{{
+function! s:source.hooks.on_init(args, context) "{{{
   let a:context.source__target = get(a:args, 0, '')
   if a:context.source__target == ''
     let a:context.source__target = input('Target: ', '.', 'dir')
@@ -63,23 +66,31 @@ function! s:find_source.hooks.on_init(args, context) "{{{
 
   let a:context.source__input = get(a:args, 1, '')
   if a:context.source__input == ''
+    redraw
     echo "Please input command-line(quote is needed) Ex: -name '*.vim'"
     let a:context.source__input = input(
           \ printf('%s %s ', g:unite_source_find_command,
-          \   a:context.source__target))
+          \   a:context.source__target), '-name ')
   endif
 endfunction"}}}
-function! s:find_source.hooks.on_close(args, context) "{{{
+function! s:source.hooks.on_close(args, context) "{{{
   if has_key(a:context, 'source__proc')
     call a:context.source__proc.waitpid()
   endif
 endfunction "}}}
 
-function! s:find_source.gather_candidates(args, context) "{{{
+function! s:source.gather_candidates(args, context) "{{{
   if empty(a:context.source__target)
         \ || a:context.source__input == ''
+    call unite#print_source_message('Completed.', s:source.name)
     let a:context.is_async = 0
-    call unite#print_message('[find] Completed.')
+    return []
+  endif
+
+  if unite#util#is_windows() &&
+        \ vimproc#get_command_name('find') =~? '/Windows/system.*/find\.exe$'
+    call unite#print_source_message('Detected windows find command.', s:source.name)
+    let a:context.is_async = 0
     return []
   endif
 
@@ -88,8 +99,8 @@ function! s:find_source.gather_candidates(args, context) "{{{
   endif
 
   let cmdline = printf('%s %s %s', g:unite_source_find_command,
-    \   a:context.source__target, a:context.source__input)
-  call unite#print_message('[find] Command-line: ' . cmdline)
+    \   string(a:context.source__target), a:context.source__input)
+  call unite#print_source_message('Command-line: ' . cmdline, s:source.name)
   let a:context.source__proc = vimproc#pgroup_open(cmdline)
 
   " Close handles.
@@ -99,16 +110,22 @@ function! s:find_source.gather_candidates(args, context) "{{{
   return []
 endfunction "}}}
 
-function! s:find_source.async_gather_candidates(args, context) "{{{
+function! s:source.async_gather_candidates(args, context) "{{{
   let stdout = a:context.source__proc.stdout
   if stdout.eof
     " Disable async.
-    call unite#print_message('[find] Completed.')
+    call unite#print_source_message('Completed.', s:source.name)
     let a:context.is_async = 0
   endif
 
-  let candidates = map(filter(stdout.read_lines(-1, 300), 'v:val != ""'),
-        \ 'fnamemodify(iconv(v:val, &termencoding, &encoding), ":p")')
+  let candidates = map(filter(
+        \ stdout.read_lines(-1, 100), 'v:val != ""'),
+        \ "fnamemodify(iconv(v:val, 'char', &encoding), ':p')")
+
+  if g:unite_source_find_ignore_pattern != ''
+    call filter(candidates, 'v:val !~ '
+          \ . string(g:unite_source_find_ignore_pattern))
+  endif
 
   if isdirectory(a:context.source__target)
     let cwd = getcwd()
@@ -130,5 +147,10 @@ function! s:find_source.async_gather_candidates(args, context) "{{{
 
   return candidates
 endfunction "}}}
+
+function! s:source.complete(args, context, arglead, cmdline, cursorpos)"{{{
+  return unite#sources#file#complete_directory(
+        \ a:args, a:context, a:arglead, a:cmdline, a:cursorpos)
+endfunction"}}}
 
 " vim: foldmethod=marker
