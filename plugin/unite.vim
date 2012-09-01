@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: unite.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 10 Apr 2012.
+" Last Modified: 27 Aug 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -22,7 +22,7 @@
 "     TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 "     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 " }}}
-" Version: 3.1, for Vim 7.2
+" Version: 4.0, for Vim 7.2
 "=============================================================================
 
 if exists('g:loaded_unite')
@@ -76,23 +76,25 @@ let g:unite_abbr_highlight =
 let g:unite_cursor_line_highlight =
       \ get(g:, 'unite_cursor_line_highlight', 'PmenuSel')
 let g:unite_data_directory =
-      \ substitute(fnamemodify(get(
+      \ substitute(substitute(fnamemodify(get(
       \   g:, 'unite_data_directory', '~/.unite'),
-      \  ':p'), '\\', '/', 'g')
+      \  ':p'), '\\', '/', 'g'), '/$', '', '')
 if !isdirectory(g:unite_data_directory)
   call mkdir(g:unite_data_directory)
 endif
 "}}}
 
 " Wrapper command.
-command! -nargs=+ -complete=customlist,unite#complete_source Unite
+command! -nargs=+ -complete=customlist,unite#complete_source
+      \ Unite
       \ call s:call_unite_empty(<q-args>)
 function! s:call_unite_empty(args)"{{{
   let [args, options] = s:parse_options_args(a:args)
   call unite#start(args, options)
 endfunction"}}}
 
-command! -nargs=+ -complete=customlist,unite#complete_source UniteWithCurrentDir
+command! -nargs=+ -complete=customlist,unite#complete_source
+      \ UniteWithCurrentDir
       \ call s:call_unite_current_dir(<q-args>)
 function! s:call_unite_current_dir(args)"{{{
   let [args, options] = s:parse_options_args(a:args)
@@ -109,7 +111,8 @@ function! s:call_unite_current_dir(args)"{{{
   call unite#start(args, options)
 endfunction"}}}
 
-command! -nargs=+ -complete=customlist,unite#complete_source UniteWithBufferDir
+command! -nargs=+ -complete=customlist,unite#complete_source
+      \ UniteWithBufferDir
       \ call s:call_unite_buffer_dir(<q-args>)
 function! s:call_unite_buffer_dir(args)"{{{
   let [args, options] = s:parse_options_args(a:args)
@@ -164,14 +167,16 @@ function! s:call_unite_input_directory(args)"{{{
   call unite#start(args, options)
 endfunction"}}}
 
-command! -nargs=? -complete=customlist,unite#complete_buffer_name UniteResume call s:call_unite_resume(<q-args>)
+command! -nargs=? -complete=customlist,unite#complete_buffer_name
+      \ UniteResume call s:call_unite_resume(<q-args>)
 function! s:call_unite_resume(args)"{{{
   let [args, options] = s:parse_options(a:args)
 
   call unite#resume(join(args), options)
 endfunction"}}}
 
-command! -nargs=1 -complete=customlist,unite#complete_buffer_name UniteClose call unite#close(<q-args>)
+command! -nargs=1 -complete=customlist,unite#complete_buffer_name
+      \ UniteClose call unite#close(<q-args>)
 
 function! s:parse_options(args)"{{{
   let args = []

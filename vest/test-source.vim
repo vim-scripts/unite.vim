@@ -5,8 +5,6 @@ let s:save_cpo = &cpo
 set cpo&vim
 " }}}
 
-source spec/base.vim
-
 let kind = {
       \ 'name' : 'hoge',
       \ 'default_action' : 'open',
@@ -34,11 +32,27 @@ function! source.gather_candidates(args, context)"{{{
         \}')
 
   if g:unite_source_file_ignore_pattern != ''
-    call filter(candidates, 'v:val.word !~ ' . string(g:unite_source_file_ignore_pattern))
+    call filter(candidates, 'v:val.word !~ ' .
+          \ string(g:unite_source_file_ignore_pattern))
   endif
 
   return candidates
 endfunction"}}}
+
+let my_file_rec = {
+      \ 'name': 'my/file_rec',
+      \ 'description': 'my files.'
+      \ }
+
+function! my_file_rec.gather_candidates(args, context)
+  return map(unite#get_candidates([['file_rec',
+      \     fnamemodify(expand('<sfile>'), ':h')]]), "{
+      \ 'word' : v:val.word,
+      \ 'action_path': v:val.action__path,
+      \ 'kind': 'file'
+      \ }")
+endfunction
+
 
 Context Source.run()
   It defines kind
@@ -47,6 +61,7 @@ Context Source.run()
 
   It defines source
     Should unite#define_source(source) == 0
+    Should unite#define_source(my_file_rec) == 0
   End
 
   It undefines kind
@@ -57,8 +72,21 @@ Context Source.run()
     Should unite#undef_source(source.name) == 0
   End
 
-  let candidates = unite#get_candidates([['grep', '**', '', 'vim']])
   It call do_candidates_action
+    let candidates = unite#get_candidates(
+          \ [['grep', fnamemodify(expand('<sfile>'), ':h'), '', 'hoge']])
+  End
+
+  It get candidates
+    let candidates = unite#get_candidates([['my_file_rec']])
+    Should len(filter(copy(candidates), "v:val.source ==# 'my_file'"))
+          \ == len(copy(candidates))
+
+    let candidates = unite#get_candidates(['file_mru'])
+    Should len(candidates) == len(readfile(
+          \ g:unite_data_directory . '/file_mru'))-1
+
+    let candidates = unite#get_candidates([['grep', 'unite.vim', '', 'vim']])
     call unite#do_candidates_action('replace', candidates)
   End
 End
