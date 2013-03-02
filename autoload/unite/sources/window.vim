@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: window.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 18 Jan 2012.
+" Last Modified: 02 Oct 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,10 +27,10 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#sources#window#define()"{{{
+function! unite#sources#window#define() "{{{
   return s:source
 endfunction"}}}
-function! unite#sources#window#_append()"{{{
+function! unite#sources#window#_append() "{{{
   if &filetype == 'unite'
     " Ignore unite window.
     return
@@ -47,9 +47,10 @@ let s:source = {
       \ 'name' : 'window',
       \ 'description' : 'candidates from window list',
       \ 'hooks' : {},
+      \ 'default_kind' : 'window',
       \}
 
-function! s:source.hooks.on_init(args, context)"{{{
+function! s:source.hooks.on_init(args, context) "{{{
   let list = range(1, winnr('$'))
   for i in list
     " Set default value.
@@ -82,22 +83,21 @@ function! s:source.hooks.on_init(args, context)"{{{
           \ 'abbr' : printf('[%d/%d] %s %s(%s)', i, winnr('$'),
           \      (i == winnr() ? '%' : i == winnr('#') ? '#' : ' '),
           \      bufname, window.cwd),
-          \ 'kind' : 'window',
           \ 'action__window_nr' : i,
           \ 'action__buffer_nr' : winbufnr(i),
           \ 'action__directory' : window.cwd,
           \ })
   endfor
 endfunction"}}}
-function! s:source.gather_candidates(args, context)"{{{
+function! s:source.gather_candidates(args, context) "{{{
   return a:context.source__candidates
 endfunction"}}}
-function! s:source.complete(args, context, arglead, cmdline, cursorpos)"{{{
+function! s:source.complete(args, context, arglead, cmdline, cursorpos) "{{{
   return ['no-current']
 endfunction"}}}
 
 " Misc
-function! s:compare(candidate_a, candidate_b)"{{{
+function! s:compare(candidate_a, candidate_b) "{{{
   return getwinvar(a:candidate_b, 'unite_window').time - getwinvar(a:candidate_a, 'unite_window').time
 endfunction"}}}
 

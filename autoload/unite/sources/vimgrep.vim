@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: vimgrep.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu at gmail.com>
-" Last Modified: 26 Aug 2012.
+" Last Modified: 31 Dec 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,9 +27,11 @@
 " Variables  "{{{
 call unite#util#set_default(
       \ 'g:unite_source_vimgrep_search_word_highlight', 'Search')
+call unite#util#set_default('g:unite_source_vimgrep_ignore_pattern',
+      \'\~$\|\.\%(o\|exe\|dll\|bak\|sw[po]\)$\|'.
+      \'\%(^\|/\)\.\%(hg\|git\|bzr\|svn\)\%($\|/\)\|'.
+      \'\%(^\|/\)tags\%(-\a*\)\?$')
 "}}}
-
-call unite#sources#grep#define()
 
 " Actions "{{{
 let s:action_vimgrep_file = {
@@ -39,7 +41,7 @@ let s:action_vimgrep_file = {
   \   'is_selectable': 1,
   \ }
 function! s:action_vimgrep_file.func(candidates) "{{{
-  call unite#start([
+  call unite#start_script([
         \ ['vimgrep', map(copy(a:candidates),
         \ 'string(substitute(v:val.action__path, "/$", "", "g"))'),
         \ ]], { 'no_quit' : 1 })
@@ -52,7 +54,7 @@ let s:action_vimgrep_directory = {
   \   'is_selectable': 1,
   \ }
 function! s:action_vimgrep_directory.func(candidates) "{{{
-  call unite#start([
+  call unite#start_script([
         \ ['vimgrep', map(copy(a:candidates), 'string(v:val.action__directory)'),
         \ ]], { 'no_quit' : 1 })
 endfunction "}}}
@@ -67,8 +69,8 @@ let s:source = {
       \ 'max_candidates': 100,
       \ 'hooks' : {},
       \ 'syntax' : 'uniteSource__Vimgrep',
-      \ 'filters' : ['matcher_regexp', 'sorter_default', 'converter_default'],
-      \ 'ignore_pattern' : g:unite_source_grep_ignore_pattern,
+      \ 'matchers' : 'matcher_regexp',
+      \ 'ignore_pattern' : g:unite_source_vimgrep_ignore_pattern,
       \ }
 
 function! s:source.hooks.on_init(args, context) "{{{
@@ -85,7 +87,7 @@ function! s:source.hooks.on_init(args, context) "{{{
     if type(get(a:args, 0, '')) == type('')
           \ && get(a:args, 0, '') == ''
       let target = unite#util#substitute_path_separator(
-            \ input('Target: ', default, 'file'))
+            \ unite#util#input('Target: ', default, 'file'))
     else
       let target = default
     endif
@@ -101,7 +103,7 @@ function! s:source.hooks.on_init(args, context) "{{{
 
   let a:context.source__input = get(a:args, 1, '')
   if a:context.source__input == ''
-    let a:context.source__input = input('Pattern: ')
+    let a:context.source__input = unite#util#input('Pattern: ')
   endif
 
   let a:context.source__directory =
@@ -109,7 +111,7 @@ function! s:source.hooks.on_init(args, context) "{{{
         \ unite#util#substitute_path_separator(
         \  unite#util#expand(targets[0])) : ''
 endfunction"}}}
-function! s:source.hooks.on_syntax(args, context)"{{{
+function! s:source.hooks.on_syntax(args, context) "{{{
   syntax case ignore
   execute 'syntax match uniteSource__VimgrepPattern /:.*\zs'
         \ . substitute(a:context.source__input, '\([/\\]\)', '\\\1', 'g')
@@ -117,7 +119,7 @@ function! s:source.hooks.on_syntax(args, context)"{{{
   execute 'highlight default link uniteSource__VimgrepPattern'
         \ g:unite_source_vimgrep_search_word_highlight
 endfunction"}}}
-function! s:source.hooks.on_post_filter(args, context)"{{{
+function! s:source.hooks.on_post_filter(args, context) "{{{
   for candidate in a:context.candidates
     let candidate.kind = ['file', 'jump_list']
     let candidate.action__directory =
@@ -194,7 +196,7 @@ function! s:source.gather_candidates(args, context) "{{{
   return _
 endfunction "}}}
 
-function! s:source.complete(args, context, arglead, cmdline, cursorpos)"{{{
+function! s:source.complete(args, context, arglead, cmdline, cursorpos) "{{{
   return unite#sources#file#complete_directory(
         \ a:args, a:context, a:arglead, a:cmdline, a:cursorpos)
 endfunction"}}}

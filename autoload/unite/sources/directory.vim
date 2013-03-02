@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: directory.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 12 May 2012.
+" Last Modified: 11 Feb 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,16 +27,18 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#sources#directory#define()"{{{
+function! unite#sources#directory#define() "{{{
   return [s:source_directory, s:source_directory_new]
 endfunction"}}}
 
 let s:source_directory = {
       \ 'name' : 'directory',
       \ 'description' : 'candidates from directory list',
+      \ 'default_kind' : 'directory',
+      \ 'alias_table' : { 'unite__new_candidate' : 'vimfiler__mkdir' },
       \}
 
-function! s:source_directory.change_candidates(args, context)"{{{
+function! s:source_directory.change_candidates(args, context) "{{{
   if !has_key(a:context, 'source__cache') || a:context.is_redraw
         \ || a:context.is_invalidate
     " Initialize cache.
@@ -83,22 +85,9 @@ function! s:source_directory.change_candidates(args, context)"{{{
 
   let candidates = copy(a:context.source__cache[glob])
 
-  " if !a:context.is_list_input
-        " \ && input !~ '^\%(/\|\a\+:/\)$'
-  if 0
-    let parent = substitute(input, '[*\\]\|\.[^/]*$', '', 'g')
-
-    if a:context.input =~ '\.$' && isdirectory(parent . '..')
-      " Add .. directory.
-      let file = unite#sources#file#create_file_dict(
-            \              parent . '..', is_relative_path)
-      let candidates = [file] + copy(candidates)
-    endif
-  endif
-
   return candidates
 endfunction"}}}
-function! s:source_directory.complete(args, context, arglead, cmdline, cursorpos)"{{{
+function! s:source_directory.complete(args, context, arglead, cmdline, cursorpos) "{{{
   return map(filter(split(glob(a:arglead . '*'), '\n'),
         \ 'isdirectory(v:val)'), "v:val.'/'")
 endfunction"}}}
@@ -106,9 +95,11 @@ endfunction"}}}
 let s:source_directory_new = {
       \ 'name' : 'directory/new',
       \ 'description' : 'directory candidates from input',
+      \ 'default_kind' : 'directory',
+      \ 'alias_table' : { 'unite__new_candidate' : 'vimfiler__mkdir' },
       \ }
 
-function! s:source_directory_new.change_candidates(args, context)"{{{
+function! s:source_directory_new.change_candidates(args, context) "{{{
   let input_list = filter(split(a:context.input,
         \                     '\\\@<! ', 1), 'v:val !~ "!"')
   let input = empty(input_list) ? '' : input_list[0]

@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: completion.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 07 Mar 2012.
+" Last Modified: 24 Jan 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,7 +27,7 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#kinds#completion#define()"{{{
+function! unite#kinds#completion#define() "{{{
   return s:kind
 endfunction"}}}
 
@@ -37,35 +37,21 @@ let s:kind = {
       \ 'action_table': {},
       \}
 
-" Actions"{{{
+" Actions "{{{
 let s:kind.action_table.insert = {
       \ 'description' : 'insert word',
       \ }
-function! s:kind.action_table.insert.func(candidate)"{{{
-  let col = a:candidate.action__complete_pos
-  let cur_text = matchstr(getline('.'), '^.*\%' . col . 'c.')
-  let word = a:candidate.action__complete_word
-
-  " Insert word.
-  let context_col = unite#get_current_unite().context.col
-  let next_line = getline('.')[context_col :]
-  call setline(line('.'),
-        \ split(cur_text . word . next_line, '\n\|\r\n'))
-  let next_col = len(cur_text)+len(word)+1
-  call cursor('', next_col)
-
-  if next_col < col('$')
-    startinsert
-  else
-    startinsert!
-  endif
+function! s:kind.action_table.insert.func(candidate) "{{{
+  call unite#kinds#common#insert_word(
+        \ a:candidate.action__complete_word,
+        \ { 'pos' : a:candidate.action__complete_pos})
 endfunction"}}}
 
 let s:kind.action_table.preview = {
       \ 'description' : 'preview word in echo area',
       \ 'is_quit' : 0,
       \ }
-function! s:kind.action_table.preview.func(candidate)"{{{
+function! s:kind.action_table.preview.func(candidate) "{{{
   echo ''
   redraw
 

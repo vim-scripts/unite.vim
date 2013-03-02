@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: uri.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 03 May 2012.
+" Last Modified: 07 Feb 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,7 +27,7 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#kinds#uri#define()"{{{
+function! unite#kinds#uri#define() "{{{
   return s:kind
 endfunction"}}}
 
@@ -39,15 +39,15 @@ let s:kind = {
       \ 'action_table' : {},
       \}
 
-" Actions"{{{
+" Actions "{{{
 let s:kind.action_table.start = {
-      \ 'description' : 'open files with associated program',
+      \ 'description' : 'open uri by browser',
       \ 'is_selectable' : 1,
       \ }
-function! s:kind.action_table.start.func(candidates)"{{{
+function! s:kind.action_table.start.func(candidates) "{{{
   for candidate in a:candidates
-    let path = get(candidate, 'action__uri',
-          \ candidate.action__path)
+    let path = has_key(candidate, 'action__uri') ?
+          \ candidate.action__uri : candidate.action__path
     if unite#util#is_windows() && path =~ '^//'
       " substitute separator for UNC.
       let path = substitute(path, '/', '\\', 'g')

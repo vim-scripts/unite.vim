@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: word.vim
+" FILE: runtimepath.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 22 Apr 2011.
+" Last Modified: 14 Dec 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,18 +27,54 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#kinds#word#define() "{{{
-  return s:kind
+" Variables  "{{{
+"}}}
+
+function! unite#sources#runtimepath#define() "{{{
+  return s:source
 endfunction"}}}
 
-let s:kind = {
-      \ 'name' : 'word',
-      \ 'default_action' : 'insert',
-      \ 'action_table': {},
-      \}
+let s:source = {
+      \ 'name' : 'runtimepath',
+      \ 'description' : 'candidates from Vim runtimepath',
+      \ 'default_action' : 'yank',
+      \ 'default_kind' : 'word',
+      \ 'action_table' : {},
+      \ }
+
+function! s:source.gather_candidates(args, context) "{{{
+  return map(map(s:split_rtp(), 'unite#util#expand(v:val)'), "{
+        \ 'word' : unite#util#expand(v:val),
+        \ 'abbr' : unite#util#substitute_path_separator(
+        \         fnamemodify(unite#util#expand(v:val), ':~')),
+        \ 'action__path' : unite#util#expand(v:val),
+        \ 'action__directory' : unite#util#expand(v:val),
+        \ 'source__runtimepath' : v:val,
+        \ }")
+endfunction"}}}
 
 " Actions "{{{
+let s:source.action_table.delete = {
+      \ 'description' : 'delete from runtimepath',
+      \ 'is_invalidate_cache' : 1,
+      \ 'is_quit' : 0,
+      \ 'is_selectable' : 1,
+      \ }
+function! s:source.action_table.delete.func(candidates) "{{{
+  for candidate in a:candidates
+    execute 'set runtimepath-=' . fnameescape(candidate.action__path)
+  endfor
+endfunction"}}}
 "}}}
+
+function! s:split_rtp(...) "{{{
+  let rtp = a:0 ? a:1 : &runtimepath
+  if type(rtp) == type([])
+    return rtp
+  endif
+  let split = split(rtp, '\\\@<!\%(\\\\\)*\zs,')
+  return map(split,'substitute(v:val, ''\\\([\\,]\)'', "\\1", "g")')
+endfunction"}}}
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

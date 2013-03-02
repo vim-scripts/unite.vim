@@ -27,18 +27,18 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#kinds#directory#define()"{{{
+function! unite#kinds#directory#define() "{{{
   return s:kind
 endfunction"}}}
 
 let s:kind = {
       \ 'name' : 'directory',
       \ 'default_action' : 'narrow',
-      \ 'action_table': {},
+      \ 'alias_table' : { 'diff' : 'dirdiff', 'tabopen' : 'tabvimfiler' },
       \ 'parents': ['file'],
       \}
 
-" Actions"{{{
+" Actions "{{{
 "}}}
 
 let &cpo = s:save_cpo

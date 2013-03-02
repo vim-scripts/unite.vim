@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: matcher_regexp.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 01 Sep 2012.
+" Last Modified: 20 Sep 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,7 +27,7 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#filters#matcher_regexp#define()"{{{
+function! unite#filters#matcher_regexp#define() "{{{
   return s:matcher
 endfunction"}}}
 
@@ -36,14 +36,14 @@ let s:matcher = {
       \ 'description' : 'regular expression matcher',
       \}
 
-function! s:matcher.filter(candidates, context)"{{{
+function! s:matcher.filter(candidates, context) "{{{
   if a:context.input == ''
     return unite#util#filter_matcher(
           \ a:candidates, '', a:context)
   endif
 
   let candidates = a:candidates
-  for input in split(a:context.input, '\\\@<! ')
+  for input in a:context.input_list
     let candidates = unite#filters#matcher_regexp#regexp_matcher(
           \ candidates, input, a:context)
   endfor
@@ -51,12 +51,23 @@ function! s:matcher.filter(candidates, context)"{{{
   return candidates
 endfunction"}}}
 
-function! unite#filters#matcher_regexp#regexp_matcher(candidates, input, context)"{{{
+function! unite#filters#matcher_regexp#regexp_matcher(candidates, input, context) "{{{
+  let expr = unite#filters#matcher_regexp#get_expr(a:input)
+
+  try
+    return unite#util#filter_matcher(a:candidates, expr, a:context)
+  catch
+    return []
+  endtry
+endfunction"}}}
+function! unite#filters#matcher_regexp#get_expr(input) "{{{
   let input = a:input
+
   if input =~ '^!'
     if input == '!'
-      return a:candidates
+      return '1'
     endif
+
     " Exclusion match.
     let expr = 'v:val.word !~ '.string(input[1:])
   elseif input !~ '[~\\.^$\[\]*]'
@@ -71,11 +82,7 @@ function! unite#filters#matcher_regexp#regexp_matcher(candidates, input, context
     let expr = 'v:val.word =~ '.string(input)
   endif
 
-  try
-    return unite#util#filter_matcher(a:candidates, expr, a:context)
-  catch
-    return []
-  endtry
+  return expr
 endfunction"}}}
 
 let &cpo = s:save_cpo

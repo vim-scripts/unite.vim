@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: converter_relative_abbr.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 12 Aug 2012.
+" Last Modified: 20 Oct 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,7 +27,7 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#filters#converter_relative_abbr#define()"{{{
+function! unite#filters#converter_relative_abbr#define() "{{{
   return s:converter
 endfunction"}}}
 
@@ -36,7 +36,7 @@ let s:converter = {
       \ 'description' : 'relative path abbr converter',
       \}
 
-function! s:converter.filter(candidates, context)"{{{
+function! s:converter.filter(candidates, context) "{{{
   try
     let directory = unite#util#substitute_path_separator(getcwd())
     if has_key(a:context, 'source__directory')
@@ -44,7 +44,8 @@ function! s:converter.filter(candidates, context)"{{{
       let directory = substitute(
             \ a:context.source__directory, '*', '', 'g')
 
-      if directory !=# old_dir
+      if directory !=# old_dir && isdirectory(directory)
+            \ && a:context.input == ''
         lcd `=directory`
       endif
     endif

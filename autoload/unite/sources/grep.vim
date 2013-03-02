@@ -2,7 +2,7 @@
 " FILE: grep.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu at gmail.com>
 "          Tomohiro Nishimura <tomohiro68 at gmail.com>
-" Last Modified: 01 Sep 2012.
+" Last Modified: 09 Feb 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -37,50 +37,8 @@ call unite#util#set_default('g:unite_source_grep_ignore_pattern',
       \'\%(^\|/\)tags\%(-\a*\)\?$')
 "}}}
 
-" Actions "{{{
-let s:action_grep_file = {
-  \   'description': 'grep this files',
-  \   'is_quit': 1,
-  \   'is_invalidate_cache': 1,
-  \   'is_selectable': 1,
-  \ }
-function! s:action_grep_file.func(candidates) "{{{
-  call unite#start([
-        \ ['grep', map(copy(a:candidates),
-        \ 'string(substitute(v:val.action__path, "/$", "", "g"))'),
-        \ ]], { 'no_quit' : 1 })
-endfunction "}}}
-
-let s:action_grep_directory = {
-  \   'description': 'grep this directories',
-  \   'is_quit': 1,
-  \   'is_invalidate_cache': 1,
-  \   'is_selectable': 1,
-  \ }
-function! s:action_grep_directory.func(candidates) "{{{
-  call unite#start([
-        \ ['grep', map(copy(a:candidates), 'string(v:val.action__directory)'),
-        \ ]], { 'no_quit' : 1 })
-endfunction "}}}
-if executable(g:unite_source_grep_command) && unite#util#has_vimproc()
-  call unite#custom_action('file,buffer',
-        \ 'grep', s:action_grep_file)
-  call unite#custom_action('file,buffer',
-        \ 'grep_directory', s:action_grep_directory)
-
-  if get(g:, 'vimfiler_as_default_explorer', 0)
-    " For unite-ssh.
-    call unite#custom_action('file/ssh',
-          \ 'grep', s:action_grep_file)
-    call unite#custom_action('file/ssh',
-          \ 'grep_directory', s:action_grep_directory)
-  endif
-endif
-" }}}
-
 function! unite#sources#grep#define() "{{{
-  return executable(g:unite_source_grep_command) && unite#util#has_vimproc() ?
-        \ s:source : []
+  return s:source
 endfunction "}}}
 
 let s:source = {
@@ -88,11 +46,23 @@ let s:source = {
       \ 'max_candidates': g:unite_source_grep_max_candidates,
       \ 'hooks' : {},
       \ 'syntax' : 'uniteSource__Grep',
-      \ 'filters' : ['matcher_regexp', 'sorter_default', 'converter_default'],
+      \ 'matchers' : 'matcher_regexp',
       \ 'ignore_pattern' : g:unite_source_grep_ignore_pattern,
+      \ 'variables' : {
+      \      'command' : g:unite_source_grep_command,
+      \      'default_opts' : g:unite_source_grep_default_opts,
+      \      'recursive_opt' : g:unite_source_grep_recursive_opt,
+      \      'search_word_highlight' : g:unite_source_grep_search_word_highlight,
+      \   },
       \ }
 
 function! s:source.hooks.on_init(args, context) "{{{
+  if !unite#util#has_vimproc()
+    call unite#print_source_error(
+          \ 'vimproc is not installed.', s:source.name)
+    return
+  endif
+
   if type(get(a:args, 0, '')) == type([])
     let a:context.source__target = a:args[0]
     let targets = a:context.source__target
@@ -106,7 +76,7 @@ function! s:source.hooks.on_init(args, context) "{{{
     if type(get(a:args, 0, '')) == type('')
           \ && get(a:args, 0, '') == ''
       let target = unite#util#substitute_path_separator(
-            \ input('Target: ', default, 'file'))
+            \ unite#util#input('Target: ', default, 'file'))
     else
       let target = default
     endif
@@ -135,7 +105,7 @@ function! s:source.hooks.on_init(args, context) "{{{
 
   let a:context.source__input = get(a:args, 2, '')
   if a:context.source__input == ''
-    let a:context.source__input = input('Pattern: ')
+    let a:context.source__input = unite#util#input('Pattern: ')
   endif
 
   let a:context.source__directory =
@@ -164,20 +134,20 @@ function! s:source.hooks.on_init(args, context) "{{{
     endif
   endif
 endfunction"}}}
-function! s:source.hooks.on_syntax(args, context)"{{{
+function! s:source.hooks.on_syntax(args, context) "{{{
   syntax case ignore
   execute 'syntax match uniteSource__GrepPattern /:.*\zs'
         \ . substitute(a:context.source__input, '\([/\\]\)', '\\\1', 'g')
         \ . '/ contained containedin=uniteSource__Grep'
   execute 'highlight default link uniteSource__GrepPattern'
-        \ g:unite_source_grep_search_word_highlight
+        \ unite#get_source_variables(a:context).search_word_highlight
 endfunction"}}}
 function! s:source.hooks.on_close(args, context) "{{{
   if has_key(a:context, 'source__proc')
     call a:context.source__proc.waitpid()
   endif
 endfunction "}}}
-function! s:source.hooks.on_post_filter(args, context)"{{{
+function! s:source.hooks.on_post_filter(args, context) "{{{
   for candidate in a:context.candidates
     let candidate.kind = [((a:context.source__ssh_path != '') ?
           \ 'file/ssh' : 'file'), 'jump_list']
@@ -188,6 +158,13 @@ function! s:source.hooks.on_post_filter(args, context)"{{{
 endfunction"}}}
 
 function! s:source.gather_candidates(args, context) "{{{
+  let variables = unite#get_source_variables(a:context)
+  if !executable(variables.command)
+    call unite#print_source_message(printf(
+          \ 'command "%s" is not executable.', variables.command), s:source.name)
+    return []
+  endif
+
   if empty(a:context.source__target)
         \ || a:context.source__input == ''
     let a:context.is_async = 0
@@ -200,9 +177,9 @@ function! s:source.gather_candidates(args, context) "{{{
   endif
 
   let cmdline = printf('%s %s %s %s %s %s',
-    \   g:unite_source_grep_command,
-    \   g:unite_source_grep_default_opts,
-    \   g:unite_source_grep_recursive_opt,
+    \   variables.command,
+    \   variables.default_opts,
+    \   variables.recursive_opt,
     \   a:context.source__extra_opts,
     \   string(a:context.source__input),
     \   join(map(a:context.source__target,
@@ -218,13 +195,24 @@ function! s:source.gather_candidates(args, context) "{{{
   endif
 
   call unite#print_source_message('Command-line: ' . cmdline, s:source.name)
-  let a:context.source__proc = vimproc#plineopen3(
-        \ vimproc#util#iconv(cmdline, &encoding, 'char'), 1)
+
+  let save_term = $TERM
+  try
+    " Disable colors.
+    let $TERM = 'dumb'
+
+    let a:context.source__proc = vimproc#plineopen3(
+          \ vimproc#util#iconv(cmdline, &encoding, 'char'), 1)
+  finally
+    let $TERM = save_term
+  endtry
 
   return []
 endfunction "}}}
 
 function! s:source.async_gather_candidates(args, context) "{{{
+  let variables = unite#get_source_variables(a:context)
+
   if !has_key(a:context, 'source__proc')
     return []
   endif
@@ -246,11 +234,18 @@ function! s:source.async_gather_candidates(args, context) "{{{
     let a:context.is_async = 0
   endif
 
-  let candidates = map(filter(
-        \ map(stdout.read_lines(-1, 100),
-        \ "unite#util#iconv(v:val, 'char', &encoding)"),
-    \  'v:val =~ "^.\\+:.\\+:.\\+$"'),
-    \ '[v:val, split(v:val[2:], ":")]')
+  let candidates = map(stdout.read_lines(-1, 100),
+          \ "unite#util#iconv(v:val, 'char', &encoding)")
+  if variables.default_opts =~ '^-[^-]*l'
+        \ || a:context.source__extra_opts =~ '^-[^-]*l'
+    let candidates = map(filter(candidates,
+          \ 'v:val != ""'),
+          \ '[v:val, [v:val[2:], 0]]')
+  else
+    let candidates = map(filter(candidates,
+          \  'v:val =~ "^.\\+:.\\+:.\\+$"'),
+          \ '[v:val, split(v:val[2:], ":")]')
+  endif
 
   if isdirectory(a:context.source__directory)
     let cwd = getcwd()
@@ -294,7 +289,7 @@ function! s:source.async_gather_candidates(args, context) "{{{
   return _
 endfunction "}}}
 
-function! s:source.complete(args, context, arglead, cmdline, cursorpos)"{{{
+function! s:source.complete(args, context, arglead, cmdline, cursorpos) "{{{
   return ['%', '#', '$buffers'] + unite#sources#file#complete_directory(
         \ a:args, a:context, a:arglead, a:cmdline, a:cursorpos)
 endfunction"}}}

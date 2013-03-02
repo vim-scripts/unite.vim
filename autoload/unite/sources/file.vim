@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: file.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 31 Aug 2012.
+" Last Modified: 11 Feb 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -32,7 +32,7 @@ call unite#util#set_default('g:unite_source_file_ignore_pattern',
       \'\%(^\|/\)\.\.\?$\|\~$\|\.\%(o\|exe\|dll\|bak\|sw[po]\)$')
 "}}}
 
-function! unite#sources#file#define()"{{{
+function! unite#sources#file#define() "{{{
   return [s:source_file, s:source_file_new]
 endfunction"}}}
 
@@ -40,9 +40,10 @@ let s:source_file = {
       \ 'name' : 'file',
       \ 'description' : 'candidates from file list',
       \ 'ignore_pattern' : g:unite_source_file_ignore_pattern,
+      \ 'default_kind' : 'file',
       \}
 
-function! s:source_file.change_candidates(args, context)"{{{
+function! s:source_file.change_candidates(args, context) "{{{
   if !has_key(a:context, 'source__cache') || a:context.is_redraw
         \ || a:context.is_invalidate
     " Initialize cache.
@@ -56,7 +57,6 @@ function! s:source_file.change_candidates(args, context)"{{{
   let input = empty(input_list) ? '' : input_list[0]
   let input = substitute(substitute(
         \ a:context.input, '\\ ', ' ', 'g'), '^\a\+:\zs\*/', '/', '')
-
 
   let path = join(a:args, ':')
   if path !=# '/' && path =~ '[\\/]$'
@@ -97,21 +97,9 @@ function! s:source_file.change_candidates(args, context)"{{{
 
   let candidates = copy(a:context.source__cache[glob])
 
-  if !a:context.is_list_input
-        \ && !is_vimfiler && input !~ '^\%(/\|\a\+:/\)$'
-    let parent = substitute(input, '[*\\]\|\.[^/]*$', '', 'g')
-
-    if a:context.input =~ '\.$' && isdirectory(parent . '..')
-      " Add .. directory.
-      let file = unite#sources#file#create_file_dict(
-            \              parent . '..', is_relative_path)
-      let candidates = [file] + copy(candidates)
-    endif
-  endif
-
   return candidates
 endfunction"}}}
-function! s:source_file.vimfiler_check_filetype(args, context)"{{{
+function! s:source_file.vimfiler_check_filetype(args, context) "{{{
   let path = s:parse_path(a:args)
 
   if isdirectory(path)
@@ -128,7 +116,7 @@ function! s:source_file.vimfiler_check_filetype(args, context)"{{{
 
   return [type, info]
 endfunction"}}}
-function! s:source_file.vimfiler_gather_candidates(args, context)"{{{
+function! s:source_file.vimfiler_gather_candidates(args, context) "{{{
   let path = s:parse_path(a:args)
 
   if isdirectory(path)
@@ -174,7 +162,7 @@ function! s:source_file.vimfiler_gather_candidates(args, context)"{{{
 
   return candidates
 endfunction"}}}
-function! s:source_file.vimfiler_dummy_candidates(args, context)"{{{
+function! s:source_file.vimfiler_dummy_candidates(args, context) "{{{
   let path = s:parse_path(a:args)
 
   if path == ''
@@ -205,11 +193,11 @@ function! s:source_file.vimfiler_dummy_candidates(args, context)"{{{
 
   return candidates
 endfunction"}}}
-function! s:source_file.complete(args, context, arglead, cmdline, cursorpos)"{{{
+function! s:source_file.complete(args, context, arglead, cmdline, cursorpos) "{{{
   return unite#sources#file#complete_file(
         \ a:args, a:context, a:arglead, a:cmdline, a:cursorpos)
 endfunction"}}}
-function! s:source_file.vimfiler_complete(args, context, arglead, cmdline, cursorpos)"{{{
+function! s:source_file.vimfiler_complete(args, context, arglead, cmdline, cursorpos) "{{{
   return unite#sources#file#complete_file(
         \ a:args, a:context, a:arglead, a:cmdline, a:cursorpos)
 endfunction"}}}
@@ -217,9 +205,10 @@ endfunction"}}}
 let s:source_file_new = {
       \ 'name' : 'file/new',
       \ 'description' : 'file candidates from input',
+      \ 'default_kind' : 'file',
       \ }
 
-function! s:source_file_new.change_candidates(args, context)"{{{
+function! s:source_file_new.change_candidates(args, context) "{{{
   let input_list = filter(split(a:context.input,
         \                     '\\\@<! ', 1), 'v:val !~ "!"')
   let input = empty(input_list) ? '' : input_list[0]
@@ -264,7 +253,7 @@ function! s:source_file_new.change_candidates(args, context)"{{{
         \ newfile, is_relative_path, 1)]
 endfunction"}}}
 
-function! s:parse_path(args)"{{{
+function! s:parse_path(args) "{{{
   let path = unite#util#substitute_path_separator(
         \ unite#util#expand(join(a:args, ':')))
   let path = unite#util#substitute_path_separator(
@@ -273,7 +262,7 @@ function! s:parse_path(args)"{{{
   return path
 endfunction"}}}
 
-function! unite#sources#file#create_file_dict(file, is_relative_path, ...)"{{{
+function! unite#sources#file#create_file_dict(file, is_relative_path, ...) "{{{
   let is_newfile = get(a:000, 0, 0)
 
   let dict = {
@@ -315,11 +304,9 @@ function! unite#sources#file#create_file_dict(file, is_relative_path, ...)"{{{
 
   return dict
 endfunction"}}}
-function! unite#sources#file#create_vimfiler_dict(candidate, exts)"{{{
+function! unite#sources#file#create_vimfiler_dict(candidate, exts) "{{{
   let a:candidate.vimfiler__is_directory =
         \ isdirectory(a:candidate.action__path)
-  let a:candidate.vimfiler__is_writable =
-        \ filewritable(a:candidate.action__path)
 
   if len(a:candidate.action__path) > 200
     " Convert to relative path.
@@ -345,7 +332,19 @@ function! unite#sources#file#create_vimfiler_dict(candidate, exts)"{{{
 
     let a:candidate.vimfiler__filesize =
           \ getfsize(a:candidate.action__path)
+    let a:candidate.vimfiler__is_readable =
+          \ filereadable(a:candidate.action__path)
+    let a:candidate.vimfiler__is_writable =
+          \ filewritable(a:candidate.action__path)
+  else
+    let a:candidate.vimfiler__is_readable =
+          \ getfperm(a:candidate.action__path) =~# 'r.x$'
+    let a:candidate.vimfiler__is_writable =
+          \ unite#util#is_windows() ?
+          \ (getfperm(a:candidate.action__path) =~# '.wx$')
+          \ : filewritable(a:candidate.action__path)
   endif
+
   let a:candidate.vimfiler__filetime =
         \ s:get_filetime(a:candidate.action__path)
   let a:candidate.vimfiler__ftype = getftype(filename)
@@ -356,7 +355,7 @@ function! unite#sources#file#create_vimfiler_dict(candidate, exts)"{{{
   endif
 endfunction"}}}
 
-function! unite#sources#file#complete_file(args, context, arglead, cmdline, cursorpos)"{{{
+function! unite#sources#file#complete_file(args, context, arglead, cmdline, cursorpos) "{{{
   let files = unite#util#glob(a:arglead . '*')
   if a:arglead =~ '^\~'
     let home_pattern = '^'.
@@ -367,7 +366,7 @@ function! unite#sources#file#complete_file(args, context, arglead, cmdline, curs
   call map(files, "escape(v:val, ' \\')")
   return files
 endfunction"}}}
-function! unite#sources#file#complete_directory(args, context, arglead, cmdline, cursorpos)"{{{
+function! unite#sources#file#complete_directory(args, context, arglead, cmdline, cursorpos) "{{{
   let files = unite#util#glob(a:arglead . '*')
   let files = filter(files, 'isdirectory(v:val)')
   if a:arglead =~ '^\~'
@@ -379,41 +378,45 @@ function! unite#sources#file#complete_directory(args, context, arglead, cmdline,
   return files
 endfunction"}}}
 
-function! unite#sources#file#copy_files(dest, srcs)"{{{
+function! unite#sources#file#copy_files(dest, srcs) "{{{
   return unite#kinds#file#do_action(a:srcs, a:dest, 'copy')
 endfunction"}}}
-function! unite#sources#file#move_files(dest, srcs)"{{{
+function! unite#sources#file#move_files(dest, srcs) "{{{
   return unite#kinds#file#do_action(a:srcs, a:dest, 'move')
 endfunction"}}}
-function! unite#sources#file#delete_files(srcs)"{{{
+function! unite#sources#file#delete_files(srcs) "{{{
   return unite#kinds#file#do_action(a:srcs, '', 'delete')
 endfunction"}}}
 
-" Add custom action table."{{{
+" Add custom action table. "{{{
 let s:cdable_action_file = {
       \ 'description' : 'open this directory by file source',
       \}
 
 function! s:cdable_action_file.func(candidate)
-  call unite#start([['file', a:candidate.action__directory]])
+  call unite#start_script([['file', a:candidate.action__directory]])
 endfunction
 
 call unite#custom_action('cdable', 'file', s:cdable_action_file)
 unlet! s:cdable_action_file
 "}}}
 
-function! s:get_filetime(filename)"{{{
+function! s:get_filetime(filename) "{{{
   let filetime = getftime(a:filename)
   if filetime < 0 && getftype(a:filename) !=# 'link'
-        \ && has('python')"{{{
+        \ && has('python') "{{{
     " Use python.
 python <<END
 import os
 import os.path
 import vim
 os.stat_float_times(False)
-vim.command('let filetime = ' +\
-str(os.path.getmtime(vim.eval('a:filename'))))
+try:
+  ftime = os.path.getmtime(vim.eval(\
+    'unite#util#iconv(a:filename, &encoding, "char")'))
+except:
+  ftime = -1
+vim.command('let filetime = ' + str(ftime))
 END
   endif"}}}
 

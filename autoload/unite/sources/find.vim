@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: find.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu at gmail.com>
-" Last Modified: 01 Sep 2012.
+" Last Modified: 11 Jan 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -39,7 +39,7 @@ let s:action_find = {
   \   'is_invalidate_cache': 1,
   \ }
 function! s:action_find.func(candidate) "{{{
-  call unite#start([['find',
+  call unite#start_script([['find',
         \ a:candidate.action__directory]],
         \ {'no_quit' : 1})
 endfunction "}}}
@@ -57,21 +57,23 @@ let s:source = {
       \ 'name': 'find',
       \ 'max_candidates': g:unite_source_find_max_candidates,
       \ 'hooks' : {},
-      \ 'filters' : ['matcher_regexp', 'sorter_default', 'converter_relative'],
+      \ 'matchers' : 'matcher_regexp',
+      \ 'converters' : 'converter_relative',
       \ 'ignore_pattern' : g:unite_source_find_ignore_pattern,
+      \ 'default_kind' : 'command',
       \ }
 
 function! s:source.hooks.on_init(args, context) "{{{
   let a:context.source__target = get(a:args, 0, '')
   if a:context.source__target == ''
-    let a:context.source__target = input('Target: ', '.', 'dir')
+    let a:context.source__target = unite#util#input('Target: ', '.', 'dir')
   endif
 
   let a:context.source__input = get(a:args, 1, '')
   if a:context.source__input == ''
     redraw
     echo "Please input command-line(quote is needed) Ex: -name '*.vim'"
-    let a:context.source__input = input(
+    let a:context.source__input = unite#util#input(
           \ printf('%s %s ', g:unite_source_find_command,
           \   a:context.source__target), '-name ')
   endif
@@ -123,7 +125,7 @@ function! s:source.async_gather_candidates(args, context) "{{{
   endif
 
   let candidates = map(filter(
-        \ stdout.read_lines(-1, 100), 'v:val != ""'),
+        \ stdout.read_lines(-1, 100), "v:val !~ '^\\s*$'"),
         \ "fnamemodify(unite#util#iconv(v:val, 'char', &encoding), ':p')")
 
   if isdirectory(a:context.source__target)
@@ -131,14 +133,12 @@ function! s:source.async_gather_candidates(args, context) "{{{
     lcd `=a:context.source__target`
   endif
 
-  call map(candidates,
-    \ '{
-    \   "word": v:val,
-    \   "abbr": fnamemodify(v:val, ":."),
-    \   "kind": "file",
-    \   "action__path" : unite#util#substitute_path_separator(v:val),
-    \   "action__directory": unite#util#path2directory(v:val),
-    \ }')
+  call map(candidates, "{
+    \   'word' : unite#util#substitute_path_separator(v:val),
+    \   'kind' : (isdirectory(v:val) ? 'directory' : 'file'),
+    \   'action__path' : unite#util#substitute_path_separator(v:val),
+    \   'action__directory' : unite#util#path2directory(v:val),
+    \ }")
 
   if isdirectory(a:context.source__target)
     lcd `=cwd`
@@ -147,7 +147,7 @@ function! s:source.async_gather_candidates(args, context) "{{{
   return candidates
 endfunction "}}}
 
-function! s:source.complete(args, context, arglead, cmdline, cursorpos)"{{{
+function! s:source.complete(args, context, arglead, cmdline, cursorpos) "{{{
   return unite#sources#file#complete_directory(
         \ a:args, a:context, a:arglead, a:cmdline, a:cursorpos)
 endfunction"}}}

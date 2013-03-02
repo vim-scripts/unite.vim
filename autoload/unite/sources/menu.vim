@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: menu.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu at gmail.com>
-" Last Modified: 03 May 2012.
+" Last Modified: 03 Feb 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -36,9 +36,10 @@ endfunction
 let s:source = {
       \ 'name' : 'menu',
       \ 'description' : 'candidates from user defined menus',
+      \ 'sorters' : 'sorter_nothing',
       \}
 
-function! s:source.gather_candidates(args, context)"{{{
+function! s:source.gather_candidates(args, context) "{{{
   let menu_name = get(a:args, 0, '')
   if menu_name == ''
     " All menus.
@@ -60,21 +61,39 @@ function! s:source.gather_candidates(args, context)"{{{
   endif
 
   let menu = g:unite_source_menu_menus[menu_name]
-  if has_key(menu, 'map')
-    let candidates = []
+
+  if has_key(menu, 'description')
+    call unite#print_source_message(
+          \ menu.description, s:source.name)
+  endif
+
+  if has_key(menu, 'command_candidates')
+    " Use default map().
+    if type(menu.command_candidates) == type([])
+      let candidates = map(copy(menu.command_candidates), "{
+            \       'word' : v:val[0], 'kind' : 'command',
+            \       'action__command' : v:val[1],
+            \     }")
+    else
+      let candidates = map(copy(menu.command_candidates), "{
+            \       'word' : v:key, 'kind' : 'command',
+            \       'action__command' : v:val,
+            \     }")
+    endif
+  elseif has_key(menu, 'candidates')
     if type(menu.candidates) == type([])
+      let candidates = []
       let key = 1
       for value in menu.candidates
         call add(candidates, menu.map(key, value))
         let key += 1
       endfor
     else
-      for [key, value] in items(menu.candidates)
-        call add(candidates, menu.map(key, value))
-      endfor
+      let candidates = map(copy(menu.candidates),
+            \ "menu.map(v:key, v:val)")
     endif
   else
-    let candidates = copy(menu.candidates)
+    let candidates = copy(get(menu, 'candidates', []))
   endif
 
   if type(candidates) == type({})
@@ -83,10 +102,10 @@ function! s:source.gather_candidates(args, context)"{{{
     let candidates = values(save_candidates)
   endif
 
-  return sort(candidates)
+  return candidates
 endfunction"}}}
 
-function! s:source.complete(args, context, arglead, cmdline, cursorpos)"{{{
+function! s:source.complete(args, context, arglead, cmdline, cursorpos) "{{{
   return keys(g:unite_source_menu_menus)
 endfunction"}}}
 

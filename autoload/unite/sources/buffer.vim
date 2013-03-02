@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: buffer.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 27 Aug 2012.
+" Last Modified: 16 Feb 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -29,12 +29,16 @@ set cpo&vim
 
 " Variables  "{{{
 let s:buffer_list = {}
+
+call unite#util#set_default(
+      \ 'g:unite_source_buffer_time_format',
+      \ '(%Y/%m/%d %H:%M:%S) ')
 "}}}
 
-function! unite#sources#buffer#define()"{{{
+function! unite#sources#buffer#define() "{{{
   return [s:source_buffer_all, s:source_buffer_tab]
 endfunction"}}}
-function! unite#sources#buffer#_append()"{{{
+function! unite#sources#buffer#_append() "{{{
   " Append the current buffer.
   let bufnr = bufnr('%')
   let s:buffer_list[bufnr] = {
@@ -65,16 +69,17 @@ let s:source_buffer_all = {
       \ 'description' : 'candidates from buffer list',
       \ 'syntax' : 'uniteSource__Buffer',
       \ 'hooks' : {},
+      \ 'default_kind' : 'buffer',
       \}
 
-function! s:source_buffer_all.hooks.on_init(args, context)"{{{
+function! s:source_buffer_all.hooks.on_init(args, context) "{{{
   return s:init_context(a:args, a:context)
 endfunction"}}}
-function! s:source_buffer_all.hooks.on_syntax(args, context)"{{{
+function! s:source_buffer_all.hooks.on_syntax(args, context) "{{{
   return s:on_syntax(a:args, a:context)
 endfunction"}}}
 
-function! s:source_buffer_all.gather_candidates(args, context)"{{{
+function! s:source_buffer_all.gather_candidates(args, context) "{{{
   if a:context.is_redraw
     " Recaching.
     let a:context.source__buffer_list =
@@ -82,18 +87,18 @@ function! s:source_buffer_all.gather_candidates(args, context)"{{{
           \                   a:context.source__is_question)
   endif
 
-  let candidates = map(copy(a:context.source__buffer_list), '{
-        \ "word" : s:make_word(v:val.action__buffer_nr),
-        \ "abbr" : s:make_abbr(v:val.action__buffer_nr, v:val.source__flags),
-        \ "kind" : "buffer",
-        \ "action__path" : unite#substitute_path_separator(bufname(v:val.action__buffer_nr)),
-        \ "action__buffer_nr" : v:val.action__buffer_nr,
-        \ "action__directory" : s:get_directory(v:val.action__buffer_nr),
-        \}')
+  let candidates = map(copy(a:context.source__buffer_list), "{
+        \ 'word' : s:make_word(v:val.action__buffer_nr),
+        \ 'abbr' : s:make_abbr(v:val.action__buffer_nr, v:val.source__flags)
+        \        . strftime(g:unite_source_buffer_time_format, v:val.source__time),
+        \ 'action__path' : unite#substitute_path_separator(bufname(v:val.action__buffer_nr)),
+        \ 'action__buffer_nr' : v:val.action__buffer_nr,
+        \ 'action__directory' : s:get_directory(v:val.action__buffer_nr),
+        \}")
 
   return candidates
 endfunction"}}}
-function! s:source_buffer_all.complete(args, context, arglead, cmdline, cursorpos)"{{{
+function! s:source_buffer_all.complete(args, context, arglead, cmdline, cursorpos) "{{{
   return ['!', '?']
 endfunction"}}}
 
@@ -102,16 +107,17 @@ let s:source_buffer_tab = {
       \ 'description' : 'candidates from buffer list in current tab',
       \ 'syntax' : 'uniteSource__Buffer',
       \ 'hooks' : {},
+      \ 'default_kind' : 'buffer',
       \}
 
-function! s:source_buffer_tab.hooks.on_init(args, context)"{{{
+function! s:source_buffer_tab.hooks.on_init(args, context) "{{{
   return s:init_context(a:args, a:context)
 endfunction"}}}
-function! s:source_buffer_tab.hooks.on_syntax(args, context)"{{{
+function! s:source_buffer_tab.hooks.on_syntax(args, context) "{{{
   return s:on_syntax(a:args, a:context)
 endfunction"}}}
 
-function! s:source_buffer_tab.gather_candidates(args, context)"{{{
+function! s:source_buffer_tab.gather_candidates(args, context) "{{{
   if a:context.is_redraw
     " Recaching.
     let a:context.source__buffer_list =
@@ -126,24 +132,24 @@ function! s:source_buffer_tab.gather_candidates(args, context)"{{{
   let list = filter(copy(a:context.source__buffer_list),
         \ 'has_key(t:unite_buffer_dictionary, v:val.action__buffer_nr)')
 
-  let candidates = map(list, '{
-        \ "word" : s:make_word(v:val.action__buffer_nr),
-        \ "abbr" : s:make_abbr(v:val.action__buffer_nr, v:val.source__flags),
-        \ "kind" : "buffer",
-        \ "action__path" : unite#substitute_path_separator(
+  let candidates = map(list, "{
+        \ 'word' : s:make_word(v:val.action__buffer_nr),
+        \ 'abbr' : s:make_abbr(v:val.action__buffer_nr, v:val.source__flags)
+        \        . strftime(g:unite_source_buffer_time_format, v:val.source__time),
+        \ 'action__path' : unite#substitute_path_separator(
         \        bufname(v:val.action__buffer_nr)),
-        \ "action__buffer_nr" : v:val.action__buffer_nr,
-        \ "action__directory" : s:get_directory(v:val.action__buffer_nr),
-        \}')
+        \ 'action__buffer_nr' : v:val.action__buffer_nr,
+        \ 'action__directory' : s:get_directory(v:val.action__buffer_nr),
+        \}")
 
   return candidates
 endfunction"}}}
-function! s:source_buffer_tab.complete(args, context, arglead, cmdline, cursorpos)"{{{
+function! s:source_buffer_tab.complete(args, context, arglead, cmdline, cursorpos) "{{{
   return ['!', '?']
 endfunction"}}}
 
 " Misc
-function! s:make_word(bufnr)"{{{
+function! s:make_word(bufnr) "{{{
   let filetype = getbufvar(a:bufnr, '&filetype')
   if filetype ==# 'vimfiler'
     let path = getbufvar(a:bufnr, 'vimfiler').current_dir
@@ -158,39 +164,43 @@ function! s:make_word(bufnr)"{{{
 
   return path
 endfunction"}}}
-function! s:make_abbr(bufnr, flags)"{{{
+function! s:make_abbr(bufnr, flags) "{{{
   let bufname = fnamemodify(bufname(a:bufnr), ':t')
   if bufname == ''
     let bufname = bufname(a:bufnr)
   endif
 
   let filetype = getbufvar(a:bufnr, '&filetype')
-  if filetype ==# 'vimfiler'
-    let vimfiler = getbufvar(a:bufnr, 'vimfiler')
-    let path = vimfiler.current_dir
-    if path =~ '^//'
-      let path = vimfiler.source . ':' . path
+  if filetype ==# 'vimfiler' || filetype ==# 'vimshell'
+    if filetype ==# 'vimfiler'
+      let vimfiler = getbufvar(a:bufnr, 'vimfiler')
+      let path = vimfiler.current_dir
+      if vimfiler.source !=# 'file'
+        let path = vimfiler.source . ':' . path
+      endif
+    else
+      let path = simplify(getbufvar(a:bufnr, 'vimshell').current_dir)
     endif
-    let path = printf('%s : [%s]', bufname, path)
-  elseif filetype ==# 'vimshell'
-    let vimshell = getbufvar(a:bufnr, 'vimshell')
-    let path = vimshell.current_dir
-    let path = printf('%s : %s [%s]', bufname,
-          \ get(vimshell, 'cmdline', ''), simplify(path))
+
+    let path = printf('%s [%s : %s]', bufname, path, filetype)
   else
     let path = simplify(fnamemodify(bufname(a:bufnr), ':~:.'))
     if a:flags != ''
       let path .= ' [' . a:flags . ']'
     endif
+
+    if filetype != ''
+      let path .= '[' . filetype . ']'
+    endif
   endif
 
   return (getbufvar(a:bufnr, '&buftype') =~# 'nofile' ? '[nofile] ' : '' ) .
-         \ unite#util#substitute_path_separator(path)
+         \ unite#util#substitute_path_separator(path) . ' '
 endfunction"}}}
-function! s:compare(candidate_a, candidate_b)"{{{
+function! s:compare(candidate_a, candidate_b) "{{{
   return a:candidate_b.source__time - a:candidate_a.source__time
 endfunction"}}}
-function! s:get_directory(bufnr)"{{{
+function! s:get_directory(bufnr) "{{{
   let filetype = getbufvar(a:bufnr, '&filetype')
   if filetype ==# 'vimfiler'
     let dir = getbufvar(a:bufnr, 'vimfiler').current_dir
@@ -203,7 +213,7 @@ function! s:get_directory(bufnr)"{{{
 
   return dir
 endfunction"}}}
-function! s:get_buffer_list(is_bang, is_question)"{{{
+function! s:get_buffer_list(is_bang, is_question) "{{{
   " Get :ls flags.
   redir => output
   silent! ls
@@ -246,8 +256,11 @@ function! s:get_buffer_list(is_bang, is_question)"{{{
 
   return list
 endfunction"}}}
-function! s:on_syntax(args, context)"{{{
-  syntax match uniteSource__Buffer_Info /\[.\{-}\]\ze\s*$/
+function! s:on_syntax(args, context) "{{{
+  syntax match uniteSource__Buffer_Name /[^/ \[\]]\+\s/
+        \ contained containedin=uniteSource__Buffer
+  highlight default link uniteSource__Buffer_Name Function
+  syntax match uniteSource__Buffer_Info /\[.\{-}\] /
         \ contained containedin=uniteSource__Buffer
   highlight default link uniteSource__Buffer_Info PreProc
   syntax match uniteSource__Buffer_Modified /\[.\{-}+\]/
@@ -256,9 +269,12 @@ function! s:on_syntax(args, context)"{{{
   syntax match uniteSource__Buffer_NoFile /\[nofile\]/
         \ contained containedin=uniteSource__Buffer
   highlight default link uniteSource__Buffer_NoFile Function
+  syntax match uniteSource__Buffer_Time /(.\{-}) /
+        \ contained containedin=uniteSource__Buffer
+  highlight default link uniteSource__Buffer_Time Statement
 endfunction"}}}
 
-function! s:init_context(args, context)"{{{
+function! s:init_context(args, context) "{{{
   let a:context.source__is_bang =
         \ (get(a:args, 0, '') ==# '!')
   let a:context.source__is_question =
@@ -268,7 +284,7 @@ function! s:init_context(args, context)"{{{
         \                   a:context.source__is_question)
 endfunction"}}}
 
-function! s:is_listed(is_bang, is_question, bufnr)"{{{
+function! s:is_listed(is_bang, is_question, bufnr) "{{{
   return bufexists(a:bufnr) &&
         \ (a:is_question ? !buflisted(a:bufnr) :
         \    (a:is_bang || buflisted(a:bufnr)))

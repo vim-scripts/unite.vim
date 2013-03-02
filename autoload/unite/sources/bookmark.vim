@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: bookmark.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 02 Jun 2012.
+" Last Modified: 02 Oct 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -36,10 +36,10 @@ let s:bookmarks = {}
 call unite#util#set_default('g:unite_source_bookmark_directory',  g:unite_data_directory . '/bookmark')
 "}}}
 
-function! unite#sources#bookmark#define()"{{{
+function! unite#sources#bookmark#define() "{{{
   return s:source
 endfunction"}}}
-function! unite#sources#bookmark#_append(filename)"{{{
+function! unite#sources#bookmark#_append(filename) "{{{
   if !isdirectory(g:unite_source_bookmark_directory)
     call mkdir(g:unite_source_bookmark_directory, 'p')
   endif
@@ -72,7 +72,8 @@ function! unite#sources#bookmark#_append(filename)"{{{
 
   redraw
   echo 'Path: ' . path
-  let bookmark_name = input('Please input bookmark file name (default): ',
+  let bookmark_name = input(
+        \ 'Please input bookmark file name (default): ',
         \ '', 'customlist,' . s:SID_PREFIX() . 'complete_bookmark_filename')
   if bookmark_name == ''
     let bookmark_name = 'default'
@@ -90,7 +91,7 @@ let s:source = {
       \ 'action_table' : {},
       \}
 
-function! s:source.gather_candidates(args, context)"{{{
+function! s:source.gather_candidates(args, context) "{{{
   let bookmark_name = get(a:args, 0, 'default')
 
   let bookmark = s:load(bookmark_name)
@@ -107,20 +108,20 @@ function! s:source.gather_candidates(args, context)"{{{
         \ 'action__directory' : unite#path2directory(v:val[1]),
         \   }")
 endfunction"}}}
-function! s:source.complete(args, context, arglead, cmdline, cursorpos)"{{{
+function! s:source.complete(args, context, arglead, cmdline, cursorpos) "{{{
   return ['default'] + map(split(glob(
         \ g:unite_source_bookmark_directory . '/' . a:arglead . '*'), '\n'),
         \ "fnamemodify(v:val, ':t')")
 endfunction"}}}
 
-" Actions"{{{
+" Actions "{{{
 let s:source.action_table.delete = {
       \ 'description' : 'delete from bookmark list',
       \ 'is_invalidate_cache' : 1,
       \ 'is_quit' : 0,
       \ 'is_selectable' : 1,
       \ }
-function! s:source.action_table.delete.func(candidates)"{{{
+function! s:source.action_table.delete.func(candidates) "{{{
   for candidate in a:candidates
     let bookmark = s:bookmarks[candidate.source_bookmark_name]
     call filter(bookmark.files, 'v:val !=# ' .
@@ -129,13 +130,29 @@ function! s:source.action_table.delete.func(candidates)"{{{
     call s:save(candidate.source_bookmark_name, bookmark)
   endfor
 endfunction"}}}
+
+let s:source.action_table.unite__new_candidate = {
+      \ 'description' : 'add new bookmark',
+      \ 'is_invalidate_cache' : 1,
+      \ 'is_quit' : 0,
+      \ }
+function! s:source.action_table.unite__new_candidate.func(candidates) "{{{
+  let filename = input('Please input bookmark filename: ', '', 'file')
+  if filename == ''
+    redraw
+    echo 'Canceled.'
+    return
+  endif
+
+  call unite#sources#bookmark#_append(filename)
+endfunction"}}}
 "}}}
 
-" Add custom action table."{{{
+" Add custom action table. "{{{
 let s:file_bookmark_action = {
       \ 'description' : 'append files to bookmark list',
       \ }
-function! s:file_bookmark_action.func(candidate)"{{{
+function! s:file_bookmark_action.func(candidate) "{{{
   " Add to bookmark.
   call unite#sources#bookmark#_append(a:candidate.action__path)
 endfunction"}}}
@@ -143,7 +160,7 @@ endfunction"}}}
 let s:buffer_bookmark_action = {
       \ 'description' : 'append buffers to bookmark list',
       \ }
-function! s:buffer_bookmark_action.func(candidate)"{{{
+function! s:buffer_bookmark_action.func(candidate) "{{{
   let filetype = getbufvar(
         \ a:candidate.action__buffer_nr, '&filetype')
   if filetype ==# 'vimfiler'
@@ -206,7 +223,7 @@ function! s:init_bookmark(filename)  "{{{
     let s:bookmarks[a:filename] = { 'file_mtime' : 0,  'files' : [] }
   endif
 endfunction"}}}
-function! s:complete_bookmark_filename(arglead, cmdline, cursorpos)"{{{
+function! s:complete_bookmark_filename(arglead, cmdline, cursorpos) "{{{
   return sort(filter(map(split(glob(g:unite_source_bookmark_directory . '/*'), '\n'),
         \ 'fnamemodify(v:val, ":t")'), 'stridx(v:val, a:arglead) == 0'))
 endfunction"}}}

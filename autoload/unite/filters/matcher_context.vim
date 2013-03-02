@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: tab.vim
+" FILE: matcher_context.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 24 Oct 2010
+" Last Modified: 20 Sep 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -24,23 +24,40 @@
 " }}}
 "=============================================================================
 
-if exists('g:loaded_unite_source_tab')
-      \ || $SUDO_USER != ''
-  finish
-endif
-
 let s:save_cpo = &cpo
 set cpo&vim
 
-augroup plugin-unite-source-tab
-  autocmd!
-  autocmd TabEnter * call unite#sources#tab#_append()
-augroup END
+function! unite#filters#matcher_context#define() "{{{
+  return s:matcher
+endfunction"}}}
 
-let g:loaded_unite_source_tab = 1
+let s:matcher = {
+      \ 'name' : 'matcher_context',
+      \ 'description' : 'context matcher',
+      \}
+
+function! s:matcher.filter(candidates, context) "{{{
+  if a:context.input == ''
+    return unite#util#filter_matcher(
+          \ a:candidates, '', a:context)
+  endif
+
+  let candidates = a:candidates
+  for input in a:context.input_list
+    if input =~# '\^.*'
+      " Search by head.
+      let candidates = unite#filters#matcher_regexp#regexp_matcher(
+            \ candidates, input, a:context)
+    else
+      let candidates = unite#filters#matcher_glob#glob_matcher(
+            \ candidates, input, a:context)
+    endif
+  endfor
+
+  return candidates
+endfunction"}}}
 
 let &cpo = s:save_cpo
 unlet s:save_cpo
 
-" __END__
 " vim: foldmethod=marker

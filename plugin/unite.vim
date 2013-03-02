@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: unite.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 27 Aug 2012.
+" Last Modified: 10 Feb 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -22,7 +22,6 @@
 "     TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 "     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 " }}}
-" Version: 4.0, for Vim 7.2
 "=============================================================================
 
 if exists('g:loaded_unite')
@@ -32,15 +31,20 @@ elseif v:version < 702
   finish
 elseif $SUDO_USER != '' && $USER !=# $SUDO_USER
       \ && $HOME !=# expand('~'.$USER)
-  echoerr '"sudo vim" and $HOME is not same to /root are detected.'
-        \.'Please use sudo.vim plugin instead of sudo command or set always_set_home in sudoers.'
+      \ && $HOME ==# expand('~'.$SUDO_USER)
+  echohl Error
+  echomsg 'unite.vim disabled: "sudo vim" is detected and $HOME is set to '
+        \.'your user''s home. '
+        \.'You may want to use the sudo.vim plugin, the "-H" option '
+        \.'with "sudo" or set always_set_home in /etc/sudoers instead.'
+  echohl None
   finish
 endif
 
 let s:save_cpo = &cpo
 set cpo&vim
 
-" Obsolute options check."{{{
+" Obsolute options check. "{{{
 if exists('g:unite_cd_command')
   echoerr 'g:unite_cd_command option does not work this version of unite.vim.'
 endif
@@ -48,7 +52,7 @@ if exists('g:unite_lcd_command')
   echoerr 'g:unite_lcd_command option does not work this version of unite.vim.'
 endif
 "}}}
-" Global options definition."{{{
+" Global options definition. "{{{
 let g:unite_update_time =
       \ get(g:, 'unite_update_time', 500)
 let g:unite_enable_start_insert =
@@ -75,6 +79,10 @@ let g:unite_abbr_highlight =
       \ get(g:, 'unite_abbr_highlight', 'Normal')
 let g:unite_cursor_line_highlight =
       \ get(g:, 'unite_cursor_line_highlight', 'PmenuSel')
+let g:unite_enable_short_source_names =
+      \ get(g:, 'unite_enable_short_source_names', 0)
+let g:unite_marked_icon =
+      \ get(g:, 'unite_marked_icon', '*')
 let g:unite_data_directory =
       \ substitute(substitute(fnamemodify(get(
       \   g:, 'unite_data_directory', '~/.unite'),
@@ -88,7 +96,7 @@ endif
 command! -nargs=+ -complete=customlist,unite#complete_source
       \ Unite
       \ call s:call_unite_empty(<q-args>)
-function! s:call_unite_empty(args)"{{{
+function! s:call_unite_empty(args) "{{{
   let [args, options] = s:parse_options_args(a:args)
   call unite#start(args, options)
 endfunction"}}}
@@ -96,7 +104,7 @@ endfunction"}}}
 command! -nargs=+ -complete=customlist,unite#complete_source
       \ UniteWithCurrentDir
       \ call s:call_unite_current_dir(<q-args>)
-function! s:call_unite_current_dir(args)"{{{
+function! s:call_unite_current_dir(args) "{{{
   let [args, options] = s:parse_options_args(a:args)
   if !has_key(options, 'input')
     let path = &filetype ==# 'vimfiler' ?
@@ -114,7 +122,7 @@ endfunction"}}}
 command! -nargs=+ -complete=customlist,unite#complete_source
       \ UniteWithBufferDir
       \ call s:call_unite_buffer_dir(<q-args>)
-function! s:call_unite_buffer_dir(args)"{{{
+function! s:call_unite_buffer_dir(args) "{{{
   let [args, options] = s:parse_options_args(a:args)
   if !has_key(options, 'input')
     let path = &filetype ==# 'vimfiler' ?
@@ -131,7 +139,7 @@ endfunction"}}}
 
 command! -nargs=+ -complete=customlist,unite#complete_source
       \ UniteWithCursorWord call s:call_unite_cursor_word(<q-args>)
-function! s:call_unite_cursor_word(args)"{{{
+function! s:call_unite_cursor_word(args) "{{{
   let [args, options] = s:parse_options_args(a:args)
   if !has_key(options, 'input')
     let options.input = expand('<cword>')
@@ -142,7 +150,7 @@ endfunction"}}}
 
 command! -nargs=+ -complete=customlist,unite#complete_source
       \ UniteWithInput call s:call_unite_input(<q-args>)
-function! s:call_unite_input(args)"{{{
+function! s:call_unite_input(args) "{{{
   let [args, options] = s:parse_options_args(a:args)
   if !has_key(options, 'input')
     let options.input = input('Input narrowing text: ', '')
@@ -153,7 +161,7 @@ endfunction"}}}
 
 command! -nargs=+ -complete=customlist,unite#complete_source
       \ UniteWithInputDirectory call s:call_unite_input_directory(<q-args>)
-function! s:call_unite_input_directory(args)"{{{
+function! s:call_unite_input_directory(args) "{{{
   let [args, options] = s:parse_options_args(a:args)
   if !has_key(options, 'input')
     let path = unite#substitute_path_separator(
@@ -169,7 +177,7 @@ endfunction"}}}
 
 command! -nargs=? -complete=customlist,unite#complete_buffer_name
       \ UniteResume call s:call_unite_resume(<q-args>)
-function! s:call_unite_resume(args)"{{{
+function! s:call_unite_resume(args) "{{{
   let [args, options] = s:parse_options(a:args)
 
   call unite#resume(join(args), options)
@@ -178,19 +186,19 @@ endfunction"}}}
 command! -nargs=1 -complete=customlist,unite#complete_buffer_name
       \ UniteClose call unite#close(<q-args>)
 
-function! s:parse_options(args)"{{{
+function! s:parse_options(args) "{{{
   let args = []
   let options = {}
   for arg in split(a:args, '\%(\\\@<!\s\)\+')
     let arg = substitute(arg, '\\\( \)', '\1', 'g')
 
+    let arg_key = substitute(arg, '=\zs.*$', '', '')
     let matched_list = filter(copy(unite#get_options()),
-          \  'stridx(arg, v:val) == 0')
+          \  'v:val ==# arg_key')
     for option in matched_list
       let key = substitute(substitute(option, '-', '_', 'g'), '=$', '', '')[1:]
       let options[key] = (option =~ '=$') ?
             \ arg[len(option) :] : 1
-      break
     endfor
 
     if empty(matched_list)
@@ -200,7 +208,7 @@ function! s:parse_options(args)"{{{
 
   return [args, options]
 endfunction"}}}
-function! s:parse_options_args(args)"{{{
+function! s:parse_options_args(args) "{{{
   let _ = []
   let [args, options] = s:parse_options(a:args)
   for arg in args

@@ -1,7 +1,7 @@
 "=============================================================================
-" FILE: default.vim
+" FILE: sorter_length.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 22 Apr 2011.
+" Last Modified: 19 Oct 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,17 +27,17 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#filters#default#define()"{{{
-  " Dummy.
-  return []
+function! unite#filters#sorter_length#define() "{{{
+  return s:sorter
 endfunction"}}}
 
-let s:default = ['matcher_default', 'sorter_default', 'converter_default']
-function! unite#filters#default#get()"{{{
-  return s:default
-endfunction"}}}
-function! unite#filters#default#use(filters)"{{{
-  let s:default = a:filters
+let s:sorter = {
+      \ 'name' : 'sorter_length',
+      \ 'description' : 'sort by length order',
+      \}
+
+function! s:sorter.filter(candidates, context) "{{{
+  return unite#util#sort_by(a:candidates, 'len(v:val.word)')
 endfunction"}}}
 
 let &cpo = s:save_cpo

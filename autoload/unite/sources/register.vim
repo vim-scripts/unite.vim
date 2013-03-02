@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: register.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 20 Aug 2012.
+" Last Modified: 24 Jan 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,7 +27,7 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#sources#register#define()"{{{
+function! unite#sources#register#define() "{{{
   return s:source
 endfunction"}}}
 
@@ -35,9 +35,10 @@ let s:source = {
       \ 'name' : 'register',
       \ 'description' : 'candidates from register',
       \ 'action_table' : {},
+      \ 'default_kind' : 'word',
       \}
 
-function! s:source.gather_candidates(args, context)"{{{
+function! s:source.gather_candidates(args, context) "{{{
   let candidates = []
 
   let max_width = winwidth(0) - 5
@@ -49,21 +50,16 @@ function! s:source.gather_candidates(args, context)"{{{
         \ 'u', 'v', 'w', 'x', 'y', 'z',
         \ '-', '.', ':', '#', '%', '/', '=',
         \ ]
-  if exists('g:yanktmp_file') && filereadable(g:yanktmp_file)
-    call add(registers, 'yanktmp')
-  endif
 
   for reg in registers
-    let register = (reg ==# 'yanktmp') ?
-          \ join(readfile(g:yanktmp_file, "b"), "\n") :
-          \ getreg(reg, 1)
+    let register = getreg(reg, 1)
     if register != ''
       call add(candidates, {
             \ 'word' : register,
             \ 'abbr' : printf('%-3s - %s', reg, register),
-            \ 'kind' : 'word',
             \ 'is_multiline' : 1,
             \ 'action__register' : reg,
+            \ 'action__regtype' : getregtype(reg),
             \ })
     endif
   endfor
@@ -71,20 +67,16 @@ function! s:source.gather_candidates(args, context)"{{{
   return candidates
 endfunction"}}}
 
-" Actions"{{{
+" Actions "{{{
 let s:source.action_table.delete = {
       \ 'description' : 'delete registers',
       \ 'is_invalidate_cache' : 1,
       \ 'is_quit' : 0,
       \ 'is_selectable' : 1,
       \ }
-function! s:source.action_table.delete.func(candidates)"{{{
+function! s:source.action_table.delete.func(candidates) "{{{
   for candidate in a:candidates
-    if candidate.action__register ==# 'yanktmp'
-      call delete(g:yanktmp_file)
-    else
-      silent! call setreg(candidate.action__register, '')
-    endif
+    silent! call setreg(candidate.action__register, '')
   endfor
 endfunction"}}}
 
@@ -93,17 +85,12 @@ let s:source.action_table.edit = {
       \ 'is_invalidate_cache' : 1,
       \ 'is_quit' : 0,
       \ }
-function! s:source.action_table.edit.func(candidate)"{{{
-  let register = (a:candidate.action__register ==# 'yanktmp') ?
-        \ join(readfile(g:yanktmp_file, "b"), "\n") :
-        \ getreg(a:candidate.action__register, 1)
+function! s:source.action_table.edit.func(candidate) "{{{
+  let register = getreg(a:candidate.action__register, 1)
   let register = substitute(register, '\r\?\n', '\\n', 'g')
   let new_value = substitute(input('', register), '\\n', '\n', 'g')
-  if a:candidate.action__register ==# 'yanktmp'
-    call writefile(split(new_value, "\n", 1), g:yanktmp_file)
-  else
-    silent! call setreg(a:candidate.action__register, new_value)
-  endif
+  silent! call setreg(a:candidate.action__register,
+        \ new_value, a:candidate.action__regtype)
 endfunction"}}}
 "}}}
 

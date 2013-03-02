@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: process.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 03 May 2012.
+" Last Modified: 23 Feb 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -28,9 +28,11 @@ let s:save_cpo = &cpo
 set cpo&vim
 
 " Variables  "{{{
+call unite#util#set_default(
+      \ 'g:unite_source_process_enable_confirm', 1)
 "}}}
 
-function! unite#sources#process#define()"{{{
+function! unite#sources#process#define() "{{{
   return executable('ps') || (unite#util#is_windows() && executable('tasklist')) ?
         \ s:source : {}
 endfunction"}}}
@@ -43,83 +45,113 @@ let s:source = {
       \ 'alias_table' : { 'delete' : 'sigkill' },
       \ }
 
-function! s:source.gather_candidates(args, context)"{{{
+function! s:source.gather_candidates(args, context) "{{{
   " Get process list.
   let _ = []
-  let command = unite#util#is_windows() ? 'tasklist' : 'ps aux'
 
-  let result = split(vimproc#system(command), '\n')
+  " In Windows, use tasklist.
+  let command = unite#util#is_windows() ? 'tasklist' : 'ps auxww'
+
+  let result = split(unite#util#system(command), '\n')
   if empty(result)
     return []
   endif
 
   if unite#util#is_windows()
-    " Use tasklist.
-    call unite#print_source_message(result[1], s:source.name)
-    for line in result[3:]
-      let process = split(line)
-      if len(process) < 5
-        " Invalid output.
-        continue
-      endif
-
-      call add(_, {
-            \ 'word' : process[0],
-            \ 'abbr' : line,
-            \ 'action__pid' : process[1],
-            \})
-    endfor
+    let [message_linenr, start_result, min_len] = [0, 2, 5]
   else
-    call unite#print_source_message(result[0], s:source.name)
-    for line in result[1:]
-      let process = split(line)
-      if len(process) < 2
-        " Invalid output.
-        continue
-      endif
-
-      call add(_, {
-            \ 'word' : join(process[10:]),
-            \ 'abbr' : '      ' . line,
-            \ 'action__pid' : process[1],
-            \})
-    endfor
+    let [message_linenr, start_result, min_len] = [0, 1, 2]
   endif
+
+  call unite#print_source_message(result[message_linenr], s:source.name)
+  for line in result[start_result :]
+    let process = split(line)
+    if len(process) < min_len
+      " Invalid output.
+      continue
+    endif
+
+    call add(_, {
+          \ 'word' : (unite#util#is_windows() ?
+          \           process[0] : join(process[10:])),
+          \ 'abbr' : repeat(' ', len(
+          \       unite#_convert_source_name(s:source.name))+1) . line,
+          \ 'action__pid' : process[1],
+          \})
+  endfor
 
   return _
 endfunction"}}}
 
-" Actions"{{{
+" Actions "{{{
 let s:source.action_table.sigkill = {
-      \ 'description' : 'send KILL signal to processes',
+      \ 'description' : 'send the KILL signal to processes',
       \ 'is_invalidate_cache' : 1,
       \ 'is_quit' : 0,
       \ 'is_selectable' : 1,
       \ }
-function! s:source.action_table.sigkill.func(candidates)"{{{
-  for candidate in a:candidates
-    call s:kill('-KILL', candidate.action__pid)
-  endfor
+function! s:source.action_table.sigkill.func(candidates) "{{{
+  call s:kill('KILL', a:candidates)
 endfunction"}}}
 
 let s:source.action_table.sigterm = {
-      \ 'description' : 'send TERM signal to processes',
+      \ 'description' : 'send the TERM signal to processes',
       \ 'is_invalidate_cache' : 1,
       \ 'is_quit' : 0,
       \ 'is_selectable' : 1,
       \ }
-function! s:source.action_table.sigterm.func(candidates)"{{{
-  for candidate in a:candidates
-    call s:kill('-TERM', candidate.action__pid)
-  endfor
+function! s:source.action_table.sigterm.func(candidates) "{{{
+  call s:kill('TERM', a:candidates)
 endfunction"}}}
 
-function! s:kill(signal, pid)
-  call unite#util#system(unite#util#is_windows() ?
-        \ printf('taskkill /PID %d', a:pid) :
-        \  printf('kill %s %d', a:signal, a:pid)
-        \ )
-endfunction
+let s:source.action_table.sigint = {
+      \ 'description' : 'send the INT signal to processes',
+      \ 'is_invalidate_cache' : 1,
+      \ 'is_quit' : 0,
+      \ 'is_selectable' : 1,
+      \ }
+function! s:source.action_table.sigint.func(candidates) "{{{
+  call s:kill('INT', a:candidates)
+endfunction"}}}
+
+let s:source.action_table.unite__new_candidate = {
+      \ 'description' : 'create new process',
+      \ 'is_invalidate_cache' : 1,
+      \ 'is_quit' : 0,
+      \ }
+function! s:source.action_table.unite__new_candidate.func(candidate) "{{{
+  let cmdline = unite#util#input(
+        \ 'Please input command args : ', '', 'shellcmd')
+
+  if unite#util#is_windows()
+    silent execute ':!start' cmdline
+  else
+    call system(cmdline . ' &')
+  endif
+endfunction"}}}
+
+function! s:kill(signal, candidates) "{{{
+  if g:unite_source_process_enable_confirm
+    if !unite#util#input_yesno(
+          \ 'Really send the ' . a:signal .' signal to the processes?')
+      redraw
+      echo 'Canceled.'
+      return
+    endif
+
+    redraw
+  endif
+
+  for candidate in a:candidates
+    call unite#util#system(unite#util#is_windows() ?
+          \ printf('taskkill /PID %d', candidate.action__pid) :
+          \  printf('kill -%s %d', a:signal, candidate.action__pid)
+          \ )
+    if unite#util#get_last_status()
+      call unite#print_error(unite#util#get_last_errmsg())
+    endif
+  endfor
+endfunction"}}}
 "}}}
 
 let &cpo = s:save_cpo

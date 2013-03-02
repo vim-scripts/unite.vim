@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: jump_list.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 26 Aug 2012.
+" Last Modified: 17 Feb 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -36,7 +36,7 @@ else
 endif
 "}}}
 
-function! unite#kinds#jump_list#define()"{{{
+function! unite#kinds#jump_list#define() "{{{
   let kind = {
         \ 'name' : 'jump_list',
         \ 'default_action' : 'open',
@@ -45,12 +45,12 @@ function! unite#kinds#jump_list#define()"{{{
         \ 'parents': ['openable'],
         \}
 
-  " Actions"{{{
+  " Actions "{{{
   let kind.action_table.open = {
         \ 'description' : 'jump to this position',
         \ 'is_selectable' : 1,
         \ }
-  function! kind.action_table.open.func(candidates)"{{{
+  function! kind.action_table.open.func(candidates) "{{{
     for candidate in a:candidates
       let bufnr = s:open(candidate)
       call s:jump(candidate, 0)
@@ -67,8 +67,7 @@ function! unite#kinds#jump_list#define()"{{{
         \ 'description' : 'preview this position',
         \ 'is_quit' : 0,
         \ }
-  function! kind.action_table.preview.func(candidate)"{{{
-    let is_highlight = !unite#get_context().auto_preview
+  function! kind.action_table.preview.func(candidate) "{{{
     let preview_windows = filter(range(1, winnr('$')),
           \ 'getwinvar(v:val, "&previewwindow") != 0')
     if empty(preview_windows)
@@ -81,7 +80,7 @@ function! unite#kinds#jump_list#define()"{{{
     let winnr = winnr()
     execute preview_windows[0].'wincmd w'
     let bufnr = s:open(a:candidate)
-    call s:jump(a:candidate, is_highlight)
+    call s:jump(a:candidate, 1)
     execute winnr.'wincmd w'
 
     if !buflisted(bufnr)
@@ -89,31 +88,34 @@ function! unite#kinds#jump_list#define()"{{{
     endif
   endfunction"}}}
 
-  if globpath(&runtimepath, 'autoload/qfreplace.vim') != ''
-    let kind.action_table.replace = {
-          \ 'description' : 'replace with qfreplace',
-          \ 'is_selectable' : 1,
-          \ }
-    function! kind.action_table.replace.func(candidates)"{{{
-      let qflist = []
-      for candidate in a:candidates
-        if has_key(candidate, 'action__line')
-              \ && has_key(candidate, 'action__text')
-          let filename = s:get_filename(candidate)
-          call add(qflist, {
-                \ 'filename' : filename,
-                \ 'lnum' : candidate.action__line,
-                \ 'text' : candidate.action__text,
-                \ })
-        endif
-      endfor
+  let kind.action_table.replace = {
+        \ 'description' : 'replace with qfreplace',
+        \ 'is_selectable' : 1,
+        \ }
+  function! kind.action_table.replace.func(candidates) "{{{
+    if globpath(&runtimepath, 'autoload/qfreplace.vim') == ''
+      echo 'qfreplace.vim is not installed.'
+      return
+    endif
 
-      if !empty(qflist)
-        call setqflist(qflist)
-        call qfreplace#start('')
+    let qflist = []
+    for candidate in a:candidates
+      if has_key(candidate, 'action__line')
+            \ && has_key(candidate, 'action__text')
+        let filename = s:get_filename(candidate)
+        call add(qflist, {
+              \ 'filename' : filename,
+              \ 'lnum' : candidate.action__line,
+              \ 'text' : candidate.action__text,
+              \ })
       endif
-    endfunction"}}}
-  endif
+    endfor
+
+    if !empty(qflist)
+      call setqflist(qflist)
+      call qfreplace#start('')
+    endif
+  endfunction"}}}
 
   return kind
 endfunction"}}}
@@ -121,7 +123,7 @@ endfunction"}}}
 "}}}
 
 " Misc.
-function! s:jump(candidate, is_highlight)"{{{
+function! s:jump(candidate, is_highlight) "{{{
   let line = get(a:candidate, 'action__line', 1)
   let pattern = get(a:candidate, 'action__pattern', '')
 
@@ -187,11 +189,11 @@ function! s:jump(candidate, is_highlight)"{{{
   call s:open_current_line(a:is_highlight)
 endfunction"}}}
 
-function! s:best_winline()"{{{
+function! s:best_winline() "{{{
   return max([1, winheight(0) * g:unite_kind_jump_list_after_jump_scroll / 100])
 endfunction"}}}
 
-function! s:adjust_scroll(best_winline)"{{{
+function! s:adjust_scroll(best_winline) "{{{
   normal! zt
   let save_cursor = getpos('.')
   let winl = 1
@@ -211,7 +213,7 @@ function! s:adjust_scroll(best_winline)"{{{
   call setpos('.', save_cursor)
 endfunction"}}}
 
-function! s:open_current_line(is_highlight)"{{{
+function! s:open_current_line(is_highlight) "{{{
   normal! zv
   normal! zz
   if a:is_highlight
@@ -219,7 +221,7 @@ function! s:open_current_line(is_highlight)"{{{
   endif
 endfunction"}}}
 
-function! s:open(candidate)"{{{
+function! s:open(candidate) "{{{
   let bufnr = s:get_bufnr(a:candidate)
   if bufnr != bufnr('%')
     if has_key(a:candidate, 'action__buffer_nr')
@@ -231,12 +233,12 @@ function! s:open(candidate)"{{{
 
   return bufnr
 endfunction"}}}
-function! s:get_filename(candidate)"{{{
+function! s:get_filename(candidate) "{{{
   return has_key(a:candidate, 'action__path') ?
             \ a:candidate.action__path :
             \ bufname(a:candidate.action__buffer_nr)
 endfunction"}}}
-function! s:get_bufnr(candidate)"{{{
+function! s:get_bufnr(candidate) "{{{
   return has_key(a:candidate, 'action__buffer_nr') ?
         \ a:candidate.action__buffer_nr :
         \ bufnr(unite#util#escape_file_searching(

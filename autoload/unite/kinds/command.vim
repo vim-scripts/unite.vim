@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: command.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 27 Aug 2012.
+" Last Modified: 02 Sep 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,7 +27,7 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#kinds#command#define()"{{{
+function! unite#kinds#command#define() "{{{
   return s:kind
 endfunction"}}}
 
@@ -38,24 +38,20 @@ let s:kind = {
       \ 'alias_table' : { 'ex' : 'nop' },
       \}
 
-" Actions"{{{
+" Actions "{{{
 let s:kind.action_table.execute = {
       \ 'description' : 'execute command',
       \ }
-function! s:kind.action_table.execute.func(candidate)"{{{
-  " Add history.
+function! s:kind.action_table.execute.func(candidate) "{{{
+  let command = a:candidate.action__command
   let type = get(a:candidate, 'action__type', ':')
-  call histadd(type, a:candidate.action__command)
-  if type ==# '/'
-    let @/ = a:candidate.action__command
-  endif
-
-  execute type.a:candidate.action__command
+  call s:add_history(type, command)
+  execute type . command
 endfunction"}}}
 let s:kind.action_table.edit = {
       \ 'description' : 'edit command',
       \ }
-function! s:kind.action_table.edit.func(candidate)"{{{
+function! s:kind.action_table.edit.func(candidate) "{{{
   if has_key(a:candidate, 'action__description')
     " Print description.
 
@@ -76,11 +72,19 @@ function! s:kind.action_table.edit.func(candidate)"{{{
 
   let command = input(':', a:candidate.action__command, 'command')
   if command != ''
+    let type = get(a:candidate, 'action__type', ':')
+    call s:add_history(type, command)
     execute command
   endif
   " call feedkeys(':' . a:candidate.action__command, 'n')
 endfunction"}}}
 "}}}
+function! s:add_history(type, command)
+  call histadd(a:type, a:command)
+  if a:type ==# '/'
+    let @/ = a:command
+  endif
+endfunction
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

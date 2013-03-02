@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: directory_mru.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 09 Jun 2012.
+" Last Modified: 11 Jan 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -48,14 +48,16 @@ call unite#util#set_default('g:unite_source_directory_mru_ignore_pattern',
       \'\|^\%(\\\\\|/mnt/\|/media/\|/temp/\|/tmp/\|\%(/private\)\=/var/folders/\)')
 "}}}
 
-function! unite#sources#directory_mru#define()"{{{
+function! unite#sources#directory_mru#define() "{{{
   return s:source
 endfunction"}}}
-function! unite#sources#directory_mru#_append()"{{{
+function! unite#sources#directory_mru#_append() "{{{
   let filetype = getbufvar(bufnr('%'), '&filetype')
-  if filetype ==# 'vimfiler'
+  if filetype ==# 'vimfiler' &&
+        \ type(getbufvar(bufnr('%'), 'vimfiler')) == type({})
     let path = getbufvar(bufnr('%'), 'vimfiler').current_dir
-  elseif filetype ==# 'vimshell'
+  elseif filetype ==# 'vimshell' &&
+        \ type(getbufvar(bufnr('%'), 'vimshell')) == type({})
     let path = getbufvar(bufnr('%'), 'vimshell').current_dir
   else
     let path = getcwd()
@@ -91,40 +93,41 @@ endfunction"}}}
 let s:source = {
       \ 'name' : 'directory_mru',
       \ 'description' : 'candidates from directory MRU list',
-      \ 'max_candidates' : 30,
       \ 'hooks' : {},
       \ 'action_table' : {},
       \ 'syntax' : 'uniteSource__DirectoryMru',
+      \ 'default_kind' : 'directory',
       \ 'ignore_pattern' :
       \    g:unite_source_directory_mru_ignore_pattern,
+      \ 'alias_table' : { 'unite__new_candidate' : 'vimfiler__mkdir' },
       \}
 
-function! s:source.hooks.on_syntax(args, context)"{{{
+function! s:source.hooks.on_syntax(args, context) "{{{
   syntax match uniteSource__DirectoryMru_Time
         \ /([^)]*)\s\+/
         \ contained containedin=uniteSource__DirectoryMru
   highlight default link uniteSource__DirectoryMru_Time Statement
 endfunction"}}}
-function! s:source.hooks.on_post_filter(args, context)"{{{
+function! s:source.hooks.on_post_filter(args, context) "{{{
   for mru in a:context.candidates
     let mru.action__directory =
           \ unite#util#path2directory(mru.action__path)
   endfor
 endfunction"}}}
 
-function! s:source.gather_candidates(args, context)"{{{
+function! s:source.gather_candidates(args, context) "{{{
   call s:load()
   return s:mru_dirs
 endfunction"}}}
 
-" Actions"{{{
+" Actions "{{{
 let s:source.action_table.delete = {
       \ 'description' : 'delete from directory_mru list',
       \ 'is_invalidate_cache' : 1,
       \ 'is_quit' : 0,
       \ 'is_selectable' : 1,
       \ }
-function! s:source.action_table.delete.func(candidates)"{{{
+function! s:source.action_table.delete.func(candidates) "{{{
   for candidate in a:candidates
     call filter(s:mru_dirs, 'v:val.action__path !=# candidate.action__path')
   endfor
@@ -133,8 +136,8 @@ function! s:source.action_table.delete.func(candidates)"{{{
 endfunction"}}}
 "}}}
 
-" Filters"{{{
-function! s:source.source__converter(candidates, context)"{{{
+" Filters "{{{
+function! s:source.source__converter(candidates, context) "{{{
   for mru in filter(copy(a:context.candidates), "!has_key(v:val, 'abbr')")
     let relative_path = unite#util#substitute_path_separator(
           \ fnamemodify(mru.action__path,
@@ -155,9 +158,7 @@ function! s:source.source__converter(candidates, context)"{{{
   return a:candidates
 endfunction"}}}
 
-let s:source.filters =
-      \ ['matcher_default', 'sorter_default',
-      \      s:source.source__converter]
+let s:source.converters = [ s:source.source__converter ]
 "}}}
 
 " Misc
@@ -196,7 +197,7 @@ function! s:load()  "{{{
   endif
 endfunction"}}}
 function! s:convert2dictionary(list)  "{{{
-  return { 'word' : a:list[0], 'kind' : 'directory',
+  return { 'word' : a:list[0],
         \ 'source__time' : a:list[1], 'action__path' : a:list[0], }
 endfunction"}}}
 function! s:convert2list(dict)  "{{{

@@ -67,6 +67,10 @@ endfunction
 function! unite#util#system(...)
   return call(s:V.system, a:000)
 endfunction
+function! unite#util#system_passwd(...)
+  return call((unite#util#has_vimproc() ?
+        \ 'vimproc#system_passwd' : 'system'), a:000)
+endfunction
 function! unite#util#get_last_status(...)
   return call(s:V.get_last_status, a:000)
 endfunction
@@ -79,8 +83,19 @@ endfunction
 function! unite#util#uniq(...)
   return call(s:List.uniq, a:000)
 endfunction
-function! unite#util#input_yesno(message)"{{{
-  let yesno = input(a:message . ' [yes/no] : ')
+function! unite#util#input(prompt, ...) "{{{
+  let context = unite#get_context()
+  let default = get(a:000, 0, '')
+  let completion = get(a:000, 1, '')
+  let args = [a:prompt, default]
+  if completion != ''
+    call add(args, completion)
+  endif
+
+  return context.unite__is_interactive ? call('input', args) : default
+endfunction"}}}
+function! unite#util#input_yesno(message) "{{{
+  let yesno = input(a:message . ' [yes/no]: ')
   while yesno !~? '^\%(y\%[es]\|n\%[o]\)$'
     redraw
     if yesno == ''
@@ -90,12 +105,12 @@ function! unite#util#input_yesno(message)"{{{
 
     " Retry.
     call unite#print_error('Invalid input.')
-    let yesno = input(a:message . ' [yes/no] : ')
+    let yesno = input(a:message . ' [yes/no]: ')
   endwhile
 
   return yesno =~? 'y\%[es]'
 endfunction"}}}
-function! unite#util#input_directory(message)"{{{
+function! unite#util#input_directory(message) "{{{
   echo a:message
   let dir = unite#util#substitute_path_separator(
         \ unite#util#expand(input('', '', 'dir')))
@@ -119,7 +134,7 @@ function! unite#util#iconv(...)
   return call(s:V.iconv, a:000)
 endfunction
 
-function! unite#util#alternate_buffer()"{{{
+function! unite#util#alternate_buffer() "{{{
   if bufnr('%') != bufnr('#') && s:buflisted(bufnr('#'))
     buffer #
     return
@@ -153,25 +168,16 @@ function! unite#util#alternate_buffer()"{{{
     bnext
   endif
 endfunction"}}}
-function! unite#util#is_cmdwin()"{{{
-  let errmsg_save = v:errmsg
-  silent! verbose noautocmd wincmd p
-  if errmsg_save !=# v:errmsg
-        \ && v:errmsg =~ '^E11:'
-    return 1
-  endif
-
-  silent! noautocmd wincmd p
-  call unite#_resize_window()
-  return 0
+function! unite#util#is_cmdwin() "{{{
+  return bufname('%') ==# '[Command Line]'
 endfunction"}}}
-function! s:buflisted(bufnr)"{{{
+function! s:buflisted(bufnr) "{{{
   return exists('t:unite_buffer_dictionary') ?
         \ has_key(t:unite_buffer_dictionary, a:bufnr) && buflisted(a:bufnr) :
         \ buflisted(a:bufnr)
 endfunction"}}}
 
-function! unite#util#glob(pattern, ...)"{{{
+function! unite#util#glob(pattern, ...) "{{{
   if a:pattern =~ "'"
     " Use glob('*').
     let cwd = getcwd()
@@ -214,31 +220,32 @@ function! unite#util#command_with_restore_cursor(command)
 
   execute next 'wincmd w'
 endfunction
-function! unite#util#expand(path)"{{{
+function! unite#util#expand(path) "{{{
   return s:V.substitute_path_separator(
         \ (a:path =~ '^\~') ? substitute(a:path, '^\~', expand('~'), '') :
         \ (a:path =~ '^\$\h\w*') ? substitute(a:path,
         \               '^\$\h\w*', '\=eval(submatch(0))', '') :
         \ a:path)
 endfunction"}}}
-function! unite#util#set_default_dictionary_helper(variable, keys, value)"{{{
+function! unite#util#set_default_dictionary_helper(variable, keys, value) "{{{
   for key in split(a:keys, '\s*,\s*')
     if !has_key(a:variable, key)
       let a:variable[key] = a:value
     endif
   endfor
 endfunction"}}}
-function! unite#util#set_dictionary_helper(variable, keys, value)"{{{
+function! unite#util#set_dictionary_helper(variable, keys, value) "{{{
   for key in split(a:keys, '\s*,\s*')
     let a:variable[key] = a:value
   endfor
 endfunction"}}}
 
 " filter() for matchers.
-function! unite#util#filter_matcher(list, expr, context)"{{{
+function! unite#util#filter_matcher(list, expr, context) "{{{
   if !a:context.unite__is_sort_nothing ||
         \ a:context.unite__max_candidates <= 0 ||
-        \ !unite#get_current_unite().is_enabled_max_candidates
+        \ !unite#get_current_unite().is_enabled_max_candidates ||
+        \ len(a:context.input_list) > 1
 
     return a:expr == '' ? a:list : filter(a:list, a:expr)
   endif
@@ -249,6 +256,7 @@ function! unite#util#filter_matcher(list, expr, context)"{{{
 
   let _ = []
   let len = 0
+
   let max = a:context.unite__max_candidates
   let offset = max*4
   for cnt in range(0, len(a:list) / offset)
@@ -262,6 +270,30 @@ function! unite#util#filter_matcher(list, expr, context)"{{{
   endfor
 
   return _[: max]
+endfunction"}}}
+
+function! unite#util#convert2list(expr) "{{{
+  return type(a:expr) ==# type([]) ? a:expr : [a:expr]
+endfunction"}}}
+
+function! unite#util#truncate_wrap(str, max, footer_width, separator) "{{{
+  let width = unite#util#wcswidth(a:str)
+  if width <= a:max
+    return unite#util#truncate(a:str, a:max)
+  elseif &l:wrap
+    return a:str
+  endif
+
+  let header_width = a:max - unite#util#wcswidth(a:separator) - a:footer_width
+  return unite#util#strwidthpart(a:str, header_width) . a:separator
+        \ . unite#util#strwidthpart_reverse(a:str, a:footer_width)
+endfunction"}}}
+
+function! unite#util#index_name(list, name) "{{{
+  return index(map(copy(a:list), 'v:val.name'), a:name)
+endfunction"}}}
+function! unite#util#get_name(list, name, default) "{{{
+  return get(a:list, unite#util#index_name(a:list, a:name), a:default)
 endfunction"}}}
 
 let &cpo = s:save_cpo

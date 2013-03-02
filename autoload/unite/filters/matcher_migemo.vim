@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: matcher_migemo.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 10 Aug 2012.
+" Last Modified: 04 Sep 2012.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -27,7 +27,7 @@
 let s:save_cpo = &cpo
 set cpo&vim
 
-function! unite#filters#matcher_migemo#define()"{{{
+function! unite#filters#matcher_migemo#define() "{{{
   if !has('migemo') && !executable('cmigemo')
     " Not supported.
     return {}
@@ -79,13 +79,13 @@ let s:matcher = {
       \ 'description' : 'migemo matcher',
       \}
 
-function! s:matcher.filter(candidates, context)"{{{
+function! s:matcher.filter(candidates, context) "{{{
   if a:context.input == ''
     return a:candidates
   endif
 
   let candidates = a:candidates
-  for input in split(a:context.input, '\\\@<! ')
+  for input in a:context.input_list
     if input =~ '^!'
       if input == '!'
         continue
