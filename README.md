@@ -1,5 +1,3 @@
-This is a mirror of http://www.vim.org/scripts/script.php?script_id=3396
-
 ## Description
 
 The unite or unite.vim plug-in can search and display information from
@@ -92,3 +90,4 @@ to set a key mapping for the command. See `:h unite`.
 ## Links
 
 unite plugins(in Japanese): https://github.com/Shougo/unite.vim/wiki/unite-plugins
+

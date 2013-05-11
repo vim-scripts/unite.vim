@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: action.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu at gmail.com>
-" Last Modified: 24 Jan 2013.
+" Last Modified: 29 Apr 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -80,7 +80,7 @@ function! s:source.gather_candidates(args, context) "{{{
 
   " Process Alias.
   let actions = s:get_actions(candidates,
-        \ unite#get_context().source__sources)
+        \ a:context.source__sources)
 
   " Uniq.
   let uniq_actions = {}
@@ -96,11 +96,12 @@ function! s:source.gather_candidates(args, context) "{{{
 
   return sort(map(filter(values(uniq_actions), 'v:val.is_listed'), "{
         \   'word' : v:val.name,
-        \   'abbr' : printf('%-" . max . "s -- %s',
-        \       v:val.name, v:val.description),
+        \   'abbr' : printf('%-" . max . "s %s -- %s',
+        \          v:val.name, (v:val.is_quit ? '!' : ' '), v:val.description),
         \   'source__candidates' : candidates,
         \   'action__action' : v:val,
-        \   'source__sources' : sources,
+        \   'source__context' : a:context,
+        \   'source__source_names' : sources,
         \ }"), 's:compare_word')
 endfunction"}}}
 
@@ -113,7 +114,7 @@ let s:source.action_table.do = {
       \ 'description' : 'do action',
       \ }
 function! s:source.action_table.do.func(candidate) "{{{
-  let context = unite#get_context()
+  let context = a:candidate.source__context
 
   if !empty(context.old_buffer_info)
     " Restore buffer_name and profile_name.
@@ -129,6 +130,11 @@ function! s:source.action_table.do.func(candidate) "{{{
     endif
   endif
 
+  if a:candidate.action__action.is_quit &&
+        \ !a:candidate.action__action.is_start
+    call unite#all_quit_session(0)
+  endif
+
   call unite#mappings#do_action(a:candidate.word,
    \ a:candidate.source__candidates, context, context.source__sources)
 
@@ -139,7 +145,7 @@ function! s:source.action_table.do.func(candidate) "{{{
 
     " Check invalidate cache flag.
     if a:candidate.action__action.is_invalidate_cache
-      for source_name in a:candidate.source__sources
+      for source_name in a:candidate.source__source_names
         call unite#invalidate_cache(source_name)
       endfor
 

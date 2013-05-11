@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: bookmark.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 02 Oct 2012.
+" Last Modified: 29 Mar 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -92,24 +92,43 @@ let s:source = {
       \}
 
 function! s:source.gather_candidates(args, context) "{{{
-  let bookmark_name = get(a:args, 0, 'default')
+    let bookmark_name = get(a:args, 0, 'default')
 
-  let bookmark = s:load(bookmark_name)
-  return map(copy(bookmark.files), "{
-        \ 'word' : (v:val[0] != '' ? '[' . v:val[0] . '] ' : '') .
-        \          (fnamemodify(v:val[1], ':~:.') != '' ?
-        \           fnamemodify(v:val[1], ':~:.') : v:val[1]),
-        \ 'kind' : (isdirectory(v:val[1]) ? 'directory' : 'jump_list'),
-        \ 'source_bookmark_name' : bookmark_name,
-        \ 'source_entry_name' : v:val[0],
-        \ 'action__path' : v:val[1],
-        \ 'action__line' : v:val[2],
-        \ 'action__pattern' : v:val[3],
-        \ 'action__directory' : unite#path2directory(v:val[1]),
-        \   }")
+    if bookmark_name == '_'
+      let bookmark_name = '*'
+    endif
+
+    if stridx(bookmark_name, '*') != -1
+      let bookmarks = map(filter(
+          \ unite#util#glob(g:unite_source_bookmark_directory . '/' . bookmark_name),
+          \ 'filereadable(v:val)'),
+          \ 'fnamemodify(v:val, ":t:r")'
+          \)
+    else 
+      let bookmarks = [bookmark_name]
+    endif
+
+    let candidates = []
+    for bookmark_name in bookmarks
+
+      let bookmark = s:load(bookmark_name)
+      let candidates += map(copy(bookmark.files), "{
+          \ 'word' : (v:val[0] != '' ? '[' . v:val[0] . '] ' : '') .
+          \          (fnamemodify(v:val[1], ':~:.') != '' ?
+          \           fnamemodify(v:val[1], ':~:.') : v:val[1]),
+          \ 'kind' : (isdirectory(v:val[1]) ? 'directory' : 'jump_list'),
+          \ 'source_bookmark_name' : bookmark_name,
+          \ 'source_entry_name' : v:val[0],
+          \ 'action__path' : v:val[1],
+          \ 'action__line' : v:val[2],
+          \ 'action__pattern' : v:val[3],
+          \ 'action__directory' : unite#path2directory(v:val[1]),
+          \   }")
+    endfor
+    return candidates
 endfunction"}}}
 function! s:source.complete(args, context, arglead, cmdline, cursorpos) "{{{
-  return ['default'] + map(split(glob(
+  return ['_', '*', 'default'] + map(split(glob(
         \ g:unite_source_bookmark_directory . '/' . a:arglead . '*'), '\n'),
         \ "fnamemodify(v:val, ':t')")
 endfunction"}}}
@@ -146,41 +165,6 @@ function! s:source.action_table.unite__new_candidate.func(candidates) "{{{
 
   call unite#sources#bookmark#_append(filename)
 endfunction"}}}
-"}}}
-
-" Add custom action table. "{{{
-let s:file_bookmark_action = {
-      \ 'description' : 'append files to bookmark list',
-      \ }
-function! s:file_bookmark_action.func(candidate) "{{{
-  " Add to bookmark.
-  call unite#sources#bookmark#_append(a:candidate.action__path)
-endfunction"}}}
-
-let s:buffer_bookmark_action = {
-      \ 'description' : 'append buffers to bookmark list',
-      \ }
-function! s:buffer_bookmark_action.func(candidate) "{{{
-  let filetype = getbufvar(
-        \ a:candidate.action__buffer_nr, '&filetype')
-  if filetype ==# 'vimfiler'
-    let filename = getbufvar(
-          \ a:candidate.action__buffer_nr, 'vimfiler').current_dir
-  elseif filetype ==# 'vimshell'
-    let filename = getbufvar(
-          \ a:candidate.action__buffer_nr, 'vimshell').current_dir
-  else
-    let filename = a:candidate.action__path
-  endif
-
-  " Add to bookmark.
-  call unite#sources#bookmark#_append(filename)
-endfunction"}}}
-
-call unite#custom_action('file', 'bookmark', s:file_bookmark_action)
-call unite#custom_action('buffer', 'bookmark', s:buffer_bookmark_action)
-unlet! s:file_bookmark_action
-unlet! s:buffer_bookmark_action
 "}}}
 
 " Misc

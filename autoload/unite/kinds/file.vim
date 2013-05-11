@@ -1,7 +1,7 @@
 "=============================================================================
 " FILE: file.vim
 " AUTHOR:  Shougo Matsushita <Shougo.Matsu@gmail.com>
-" Last Modified: 09 Feb 2013.
+" Last Modified: 29 Apr 2013.
 " License: MIT license  {{{
 "     Permission is hereby granted, free of charge, to any person obtaining
 "     a copy of this software and associated documentation files (the
@@ -231,6 +231,7 @@ let s:kind.action_table.grep = {
       \   'is_quit': 1,
       \   'is_invalidate_cache': 1,
       \   'is_selectable': 1,
+      \   'is_start' : 1,
       \ }
 function! s:kind.action_table.grep.func(candidates) "{{{
   call unite#start_script([
@@ -244,6 +245,7 @@ let s:kind.action_table.grep_directory = {
       \   'is_quit': 1,
       \   'is_invalidate_cache': 1,
       \   'is_selectable': 1,
+      \   'is_start' : 1,
       \ }
 function! s:kind.action_table.grep_directory.func(candidates) "{{{
   call unite#start_script([
@@ -462,7 +464,7 @@ function! s:kind.action_table.vimfiler__newfile.func(candidate) "{{{
   try
     lcd `=vimfiler_current_dir`
 
-    let filenames = input('New files name(comma separated multiple files): ',
+    let filenames = input('New files name(comma separated): ',
           \               '', 'file')
     if filenames == ''
       redraw
@@ -475,7 +477,7 @@ function! s:kind.action_table.vimfiler__newfile.func(candidate) "{{{
 
       if filereadable(filename)
         redraw
-        echo filename . ' is already exists.'
+        call unite#print_error(filename . ' is already exists.')
         continue
       endif
 
@@ -517,6 +519,7 @@ endfunction"}}}
 let s:kind.action_table.vimfiler__shellcmd = {
       \ 'description' : 'execute shell command',
       \ 'is_listed' : 0,
+      \ 'is_start' : 1,
       \ }
 function! s:kind.action_table.vimfiler__shellcmd.func(candidate) "{{{
   let vimfiler_current_dir =
@@ -557,26 +560,30 @@ function! s:kind.action_table.vimfiler__mkdir.func(candidates) "{{{
   try
     lcd `=vimfiler_current_dir`
 
-    let dirname = input('New directory name: ', '', 'dir')
+    let dirnames = split(input(
+          \ 'New directory names(comma separated): ', '', 'dir'), ',')
     redraw
 
-    if dirname == ''
+    if empty(dirnames)
       echo 'Canceled.'
       return
     endif
 
-    let dirname = unite#util#substitute_path_separator(
-          \ fnamemodify(dirname, ':p'))
+    for dirname in dirnames
+      let dirname = unite#util#substitute_path_separator(
+            \ fnamemodify(dirname, ':p'))
 
-    if filereadable(dirname) || isdirectory(dirname)
-      echo dirname . ' is already exists.'
-      return
-    endif
+      if filereadable(dirname) || isdirectory(dirname)
+        redraw
+        call unite#print_error(dirname . ' is already exists.')
+        continue
+      endif
 
-    call mkdir(dirname, 'p')
+      call mkdir(dirname, 'p')
+    endfor
 
     " Move marked files.
-    if !get(context, 'vimfiler__is_dummy', 1)
+    if !get(context, 'vimfiler__is_dummy', 1) && len(dirnames) == 1
       call unite#sources#file#move_files(dirname, a:candidates)
     endif
   finally
@@ -656,7 +663,7 @@ function! s:external(command, dest_dir, src_files) "{{{
         \   map(src_files, '''"''.v:val.''"''')), '&'), 'g')
   let command_line = substitute(command_line,
         \'\$dest\>', escape('"'.dest_dir.'"', '&'), 'g')
-  " echomsg command_line
+  let command_line = escape(command_line, '`')
 
   let output = unite#util#system(command_line)
 
